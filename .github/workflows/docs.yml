@@ -1,0 +1,70 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Authenticate Lake dependencies
+        env:
+          TERMCOLOR_READ_TOKEN: ${{ secrets.TERMCOLOR_READ_TOKEN }}
+        run: |
+          if [ -n "$TERMCOLOR_READ_TOKEN" ]; then
+            git config --global url."https://x-access-token:${TERMCOLOR_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+      - name: Cache elan toolchain
+        uses: actions/cache@v6
+        with:
+          path: ~/.elan
+          key: elan-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'docbuild/lean-toolchain') }}
+      - name: Cache build
+        uses: actions/cache@v6
+        with:
+          path: |
+            .lake
+            docbuild/.lake
+          key: lake-docs-${{ runner.os }}-${{ hashFiles('lakefile.lean', 'docbuild/lakefile.toml', 'docbuild/lake-manifest.json', 'lean-toolchain', 'docbuild/lean-toolchain') }}
+          restore-keys: lake-docs-${{ runner.os }}-
+      - name: Install elan
+        run: |
+          set -euo pipefail
+          if [ ! -x "$HOME/.elan/bin/elan" ]; then
+            curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf \
+              | sh -s -- -y --default-toolchain none
+          fi
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build API docs
+        env:
+          TERMCOLOR_READ_TOKEN: ${{ secrets.TERMCOLOR_READ_TOKEN }}
+        run: |
+          lake -d docbuild update
+          lake -d docbuild build TermColor.Repl
+          lake -d docbuild build TermColor.Repl:docs
+          touch docbuild/.lake/build/doc/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docbuild/.lake/build/doc
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

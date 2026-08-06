@@ -33,10 +33,11 @@ jobs:
           key: lake-${{ runner.os }}-${{ hashFiles('lake-manifest.json', 'lakefile.lean', 'lean-toolchain') }}
           restore-keys: lake-${{ runner.os }}-
       - name: Authenticate Lake dependencies
-        if: ${{ env.TERMCOLOR_READ_TOKEN != '' }}
         env:
           TERMCOLOR_READ_TOKEN: ${{ secrets.TERMCOLOR_READ_TOKEN }}
-        run: git config --global url."https://x-access-token:${TERMCOLOR_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
+        run: |
+          test -n "$TERMCOLOR_READ_TOKEN"
+          git config --global url."https://x-access-token:${TERMCOLOR_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
       - uses: leanprover/lean-action@v1
         with:
           build-args: "TermColor.Repl TermColor.Repl.Properties"
