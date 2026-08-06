@@ -40,4 +40,4 @@ jobs:
           git config --global url."https://x-access-token:${TERMCOLOR_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
       - uses: leanprover/lean-action@v1
         with:
-          build-args: "TermColor.Repl TermColor.Repl.Properties"
+          build-args: "TermColor.Repl TermColor.Repl.Terminal TermColor.Repl.Properties"

@@ -16,5 +16,5 @@
 
 ## Release
 
-- [ ] Add generated API documentation once the public module boundary settles.
-- [ ] Publish a tagged release after the calculator migration is stable.
+- [x] Add generated API documentation workflow.
+- [x] Publish the `0.1.0` tagged release.
