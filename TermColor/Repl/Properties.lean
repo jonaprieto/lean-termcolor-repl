@@ -1,0 +1,44 @@
+/-
+Copyright (c) 2026 Jonathan Prieto-Cubides. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Jonathan Prieto-Cubides
+-/
+
+import TermColor.Repl
+
+namespace TermColor.Repl.Properties
+
+open TermColor.Widgets
+
+private def config : TextInputConfig := { width := 120, maxLength := 120 }
+
+private def commandCompletion : TextInputState → List Completion
+  | input =>
+      ["/help", "/history"].filter (·.startsWith input.value) |>.map
+        (fun replacement => { replacement })
+
+example :
+    (recallUp { history := #["first", "second"] }).input.value = "second" := by
+  native_decide
+
+example :
+    (recallDown { history := #["first", "second"], historyIndex := some 0 }).input.value =
+      "second" := by
+  native_decide
+
+example :
+    (completeInput { value := "/he", cursor := 3 }
+      [{ replacement := "/help" }]).value = "/help" := by
+  native_decide
+
+example :
+    (completeInput { value := "/h", cursor := 2 }
+      [{ replacement := "/help" }, { replacement := "/history" }]).value = "/h" := by
+  native_decide
+
+example :
+    (update config commandCompletion { input := { value := "2+2", cursor := 3 }} .enter).2 =
+      .submit "2+2" := by
+  native_decide
+
+end TermColor.Repl.Properties

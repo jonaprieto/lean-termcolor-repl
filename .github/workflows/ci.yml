@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Lean style (100-col / trailing-ws / tabs)
+        run: python3 scripts/style-check.py
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Cache elan toolchain
+        uses: actions/cache@v6
+        with:
+          path: ~/.elan
+          key: elan-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}
+      - name: Cache build
+        uses: actions/cache@v6
+        with:
+          path: .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lake-manifest.json', 'lakefile.lean', 'lean-toolchain') }}
+          restore-keys: lake-${{ runner.os }}-
+      - name: Authenticate Lake dependencies
+        if: ${{ env.TERMCOLOR_READ_TOKEN != '' }}
+        env:
+          TERMCOLOR_READ_TOKEN: ${{ secrets.TERMCOLOR_READ_TOKEN }}
+        run: git config --global url."https://x-access-token:${TERMCOLOR_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
+      - uses: leanprover/lean-action@v1
+        with:
+          build-args: "TermColor.Repl TermColor.Repl.Properties"
