@@ -26,7 +26,7 @@ rev = "main"
 the current `TextInputState`.
 
 `TermColor.Repl.Terminal` also provides terminal-size lookup and key waiting with live resize
-redraws. The full model/submission loop remains application-owned for now.
+redraws, plus a callback-driven `run` loop and `suspend` boundary for transient commands.
 
 ```lean
 import TermColor.Repl
