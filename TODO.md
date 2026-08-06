@@ -2,7 +2,7 @@
 
 ## Reusable REPL features
 
-- [ ] Extract the terminal runner around `Screen`, raw input, and live resize.
+- [ ] Extract the full terminal runner around `Screen`, raw input, and submission callbacks.
 - [ ] Add a redraw/suspend boundary for commands that own transient live widgets.
 - [ ] Support multiline input when a real client needs it.
 - [ ] Add persistent history only when a client needs history across sessions.

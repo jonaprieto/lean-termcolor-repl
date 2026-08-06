@@ -25,6 +25,9 @@ rev = "main"
 `termcolor-widgets` `Key` and returns an `Action`; applications provide completion candidates for
 the current `TextInputState`.
 
+`TermColor.Repl.Terminal` also provides terminal-size lookup and key waiting with live resize
+redraws. The full model/submission loop remains application-owned for now.
+
 ```lean
 import TermColor.Repl
 
