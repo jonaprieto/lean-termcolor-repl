@@ -7,8 +7,6 @@
 Pure input history, key handling, adaptive completion, and cooperative background-job support for
 Lean 4 terminal REPLs.
 
-Version: `v0.5.0`
-
 ## Install
 
 ```lean
