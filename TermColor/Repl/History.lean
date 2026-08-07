@@ -24,7 +24,7 @@ deriving Repr
 private def trimHistory (maxEntries : Nat) (history : List String) : List String :=
   if history.length > maxEntries then history.drop (history.length - maxEntries) else history
 
-/-- Normalize lines for storage, skipping empty lines and optionally keeping the newest duplicate. -/
+/-- Normalize lines, skipping empty lines and optionally keeping the newest duplicate. -/
 def normalizeHistory (config : HistoryConfig) (lines : List String) : Array String :=
   let append (history : List String) (line : String) : List String :=
     let line := line.trimAscii.toString
