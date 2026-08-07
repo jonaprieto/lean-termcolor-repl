@@ -44,6 +44,26 @@ def sleep (token : Cancellation) (milliseconds : UInt32) : IO Bool := do
 
 end Cancellation
 
+structure KeyReader where
+  result : IO.Ref (Option (Option Key))
+  active : IO.Ref Bool
+
+namespace KeyReader
+
+def new : IO KeyReader := do
+  pure { result := ← IO.mkRef none, active := ← IO.mkRef false }
+
+def ensureReading (reader : KeyReader) : IO Unit := do
+  unless ← reader.active.get do
+    reader.active.set true
+    let _task ← IO.asTask do
+      try
+        reader.result.set (some (← readKey))
+      finally
+        reader.active.set false
+
+end KeyReader
+
 structure JobConfig (Model : Type) where
   shouldRun : Model → String → Bool := fun _ _ => true
   start : Model → String → Model
@@ -71,22 +91,30 @@ def currentSize (fallback : Size) : IO Size := do
   pure ((← terminalSize).getD fallback)
 
 def readKeyWithResize (tickMs : UInt32) (fallback : Size) (screen : Screen)
-    (render : Screen → IO Screen) (wake : IO Bool := pure false) : IO (Screen × Option Key) := do
-  let result ← IO.mkRef (none : Option (Option Key))
-  let _task ← IO.asTask do
-    result.set (some (← readKey))
+    (render : Screen → IO Screen) (wake : IO Bool := pure false)
+    (reader : Option KeyReader := none) : IO (Screen × Option Key) := do
+  let reader ← match reader with
+    | some reader => pure reader
+    | none => KeyReader.new
+  reader.ensureReading
   let mut screen := screen
   let mut size ← currentSize fallback
-  while (← result.get).isNone do
+  let mut woken := false
+  while !woken && (← reader.result.get).isNone do
     if ← wake then
-      result.set (some none)
+      woken := true
     else
       let nextSize ← currentSize fallback
       if nextSize != size then
         screen ← render screen
         size := nextSize
       IO.sleep tickMs
-  pure (screen, (← result.get).getD none)
+  if woken then
+    pure (screen, none)
+  else
+    let key := (← reader.result.get).getD none
+    reader.result.set none
+    pure (screen, key)
 
 private structure JobRuntime (Model : Type) where
   cancellation : Cancellation
@@ -103,6 +131,7 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
       let mut model := config.initial
       let mut screen ← Screen.start
       let mut job : Option (JobRuntime Model) := none
+      let reader ← KeyReader.new
       while config.isRunning model do
         match config.jobs, job with
         | some jobs, some runtime =>
@@ -121,12 +150,19 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
           | some runtime => do pure (← runtime.result.get).isSome
           | none => pure false
         let (nextScreen, key) ← readKeyWithResize config.tickMs config.fallbackSize screen
-          (fun screen => render config screen model) wake
+          (fun screen => render config screen model) wake (some reader)
         screen := nextScreen
         match key with
         | none =>
             if job.isNone then
               model := config.quit model
+            else
+              match job with
+              | some runtime =>
+                  runtime.cancellation.cancel
+                  model := config.quit model
+                  job := none
+              | none => pure ()
         | some key =>
             if key == .escape then
               match config.jobs, job with
