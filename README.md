@@ -1,78 +1,54 @@
 # termcolor-repl
 
-[![CI](https://github.com/jonaprieto/lean-termcolor-repl/workflows/CI/badge.svg)](https://github.com/jonaprieto/lean-termcolor-repl/actions/workflows/ci.yml)
+[![CI](https://github.com/jonaprieto/lean-termcolor-repl/actions/workflows/ci.yml/badge.svg)](https://github.com/jonaprieto/lean-termcolor-repl/actions/workflows/ci.yml)
 [![Lean 4](https://img.shields.io/badge/Lean%204-library-5f5f5f)](lean-toolchain)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
-Pure input history, key handling, and adaptive completion for Lean 4 terminal REPLs.
+Pure input history, key handling, adaptive completion, and cooperative background-job support for
+Lean 4 terminal REPLs.
 
-`termcolor-repl` is the reusable layer above
-[`termcolor-terminal`](https://github.com/jonaprieto/lean-termcolor-terminal). It deliberately
-keeps application models, transcript rendering, command effects, and diagnostics in the client.
+Version: `v0.5.0`
 
 ## Install
 
-```toml
-[[require]]
-name = "termcolor-repl"
-git = "https://github.com/jonaprieto/lean-termcolor-repl"
-rev = "main"
+```lean
+require termcolor-repl from git
+  "https://github.com/jonaprieto/lean-termcolor-repl.git" @ "v0.5.0"
 ```
 
-## Current API
+## API
 
-`TermColor.Repl.State` stores the editable input and submitted history. `update` consumes a
-`termcolor-widgets` `Key` and returns an `Action`; applications provide completion candidates for
-the current `TextInputState`.
+`TermColor.Repl.State` stores editable input and submitted history. `update` maps widget keys to
+pure actions. `FileCompletion` provides bounded completion for the token under the cursor, and
+`History` provides opt-in file persistence through `Except` results.
 
-`TermColor.Repl.Terminal` also provides terminal-size lookup and key waiting with live resize
-redraws, plus a callback-driven `run` loop and `suspend` boundary for transient commands.
-
-`TermColor.Repl.FileCompletion` provides bounded, hidden-file-aware completion for the token under
-the cursor. Terminal callbacks return `IO (List Completion)` so filesystem candidates are read only
-when the user presses tab.
-
-Multiple candidates stay in a bounded `CompletionMenu`; tab and arrow keys select candidates, enter
-accepts the selection, and escape dismisses it.
-
-Applications can set `Terminal.Config.jobs` to a `JobConfig` for cooperative background jobs.
-Each submitted line may run independently while input, resize redraws, and other jobs continue;
-completed results are merged by the renderer, and escape or ctrl-x calls the configured
-cancellation callback for all active jobs.
-
-Pass `MultilineConfig` to `TermColor.Repl.Terminal.Config.multiline` to opt into multiline input;
-the configured line-break key inserts a newline while enter still submits one logical history item.
-
-Persistent history is opt-in through `TermColor.Repl.History`; `loadHistory` and `saveHistory`
-return `Except` values so a missing or unwritable history file does not alter the active session.
+`TermColor.Repl.Terminal` adds terminal size lookup, resize-aware key input, multiline input,
+transient-command suspension, and cooperative jobs. Each submitted line may run independently;
+the renderer merges completed results while input and other jobs continue.
 
 ```lean
 import TermColor.Repl
 
-open TermColor
-open TermColor.Repl
-open TermColor.Widgets
+open TermColor TermColor.Repl TermColor.Widgets
 
 def complete : TextInputState → List Completion
-  | input =>
-      ["/help", "/history"].filter (·.startsWith input.value) |>.map
-        (fun replacement => { replacement })
+  | input => ["/help", "/history"].filter (·.startsWith input.value) |>.map
+      (fun replacement => { replacement })
 
 def handle (state : State) (key : Key) : State × Action :=
   update { width := 120, maxLength := 120 } complete state key
 ```
 
-One candidate replaces the input. Multiple candidates expand only to their shared prefix, so
-completion adapts naturally from commands to command options without knowing either domain.
-
-## Development
+## Build
 
 ```sh
-lake build TermColor.Repl
-pre-commit run --all-files
+lake build TermColor.Repl TermColor.Repl.Properties
 ```
 
-See [TODO.md](TODO.md) for intentionally deferred features.
+## Related projects
+
+[`termcolor-terminal`](https://github.com/jonaprieto/lean-termcolor-terminal) owns terminal IO;
+[`lean-calc-chat`](https://github.com/jonaprieto/lean-calc-chat) is a complete consumer.
 
 ## License
 
