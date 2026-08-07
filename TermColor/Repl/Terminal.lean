@@ -165,14 +165,14 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                   job := none
               | none => pure ()
         | some key =>
-            if key == .escape || key == .ctrl 'c' then
+            if key == .escape || key == .ctrl 'x' then
               match config.jobs, job with
               | some jobs, some runtime =>
                   runtime.cancellation.cancel
                   model := jobs.cancel model
                   job := none
               | _, _ =>
-                  if key == .ctrl 'c' then
+                  if key == .ctrl 'x' then
                     model := config.quit model
                   else
                     let currentState := config.getState model
