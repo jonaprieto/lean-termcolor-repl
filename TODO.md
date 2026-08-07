@@ -6,7 +6,7 @@
   [Issue #6](https://github.com/jonaprieto/lean-termcolor-repl/issues/6)
 - [x] Add a redraw/suspend boundary for commands that own transient live widgets.
   [Issue #5](https://github.com/jonaprieto/lean-termcolor-repl/issues/5)
-- [ ] Support multiline input when a real client needs it.
+- [x] Support opt-in multiline input with a configurable line-break key.
   [Issue #1](https://github.com/jonaprieto/lean-termcolor-repl/issues/1)
 - [x] Add optional persistent history with explicit empty-line and duplicate handling.
   [Issue #3](https://github.com/jonaprieto/lean-termcolor-repl/issues/3)
@@ -33,4 +33,4 @@
 
 - [x] Add generated API documentation workflow.
 - [x] Publish the `0.1.0` tagged release.
-- [ ] Publish `0.2.0` with multiline input.
+- [x] Publish the `0.2.0` tagged release with multiline input.
