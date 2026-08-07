@@ -35,9 +35,10 @@ when the user presses tab.
 Multiple candidates stay in a bounded `CompletionMenu`; tab and arrow keys select candidates, enter
 accepts the selection, and escape dismisses it.
 
-Applications can set `Terminal.Config.jobs` to a `JobConfig` for one cooperative background job.
-The runner keeps editing and resize redraws live, wakes when the result arrives, and calls the
- configured cancellation callback when escape or ctrl-x is pressed.
+Applications can set `Terminal.Config.jobs` to a `JobConfig` for cooperative background jobs.
+Each submitted line may run independently while input, resize redraws, and other jobs continue;
+completed results are merged by the renderer, and escape or ctrl-x calls the configured
+cancellation callback for all active jobs.
 
 Pass `MultilineConfig` to `TermColor.Repl.Terminal.Config.multiline` to opt into multiline input;
 the configured line-break key inserts a newline while enter still submits one logical history item.
