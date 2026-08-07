@@ -6,6 +6,9 @@ Authors: Jonathan Prieto-Cubides
 
 import TermColor.Repl
 import TermColor.Terminal
+import Std.Async.Timer
+import Std.Sync.CancellationToken
+import Std.Sync.Notify
 
 /-!
 # TermColor.Repl.Terminal
@@ -22,36 +25,49 @@ open TermColor.Terminal
 open TermColor.Widgets
 
 structure Cancellation where
-  flag : IO.Ref Bool
+  token : Std.CancellationToken
 
 namespace Cancellation
 
 def new : IO Cancellation := do
-  pure { flag := ← IO.mkRef false }
+  pure { token := ← Std.CancellationToken.new }
 
 def cancel (token : Cancellation) : IO Unit :=
-  token.flag.set true
+  token.token.cancel
 
 def isCancelled (token : Cancellation) : IO Bool :=
-  token.flag.get
+  token.token.isCancelled
 
 def sleep (token : Cancellation) (milliseconds : UInt32) : IO Bool := do
   if ← token.isCancelled then
     pure false
   else
-    IO.sleep milliseconds
-    pure !(← token.isCancelled)
+    let timer ← (Std.Async.Selector.sleep
+      (Std.Time.Millisecond.Offset.ofNat milliseconds.toNat)).block
+    let completed ← (Std.Async.Selectable.one #[
+      .case token.token.selector (fun _ => pure false),
+      .case timer (fun _ => pure true)
+    ]).block
+    if completed then
+      pure !(← token.isCancelled)
+    else
+      pure false
 
 end Cancellation
 
 structure KeyReader where
   result : IO.Ref (Option (Option Key))
   active : IO.Ref Bool
+  signal : Std.Notify
 
 namespace KeyReader
 
 def new : IO KeyReader := do
-  pure { result := ← IO.mkRef none, active := ← IO.mkRef false }
+  pure {
+    result := ← IO.mkRef none
+    active := ← IO.mkRef false
+    signal := ← Std.Notify.new
+  }
 
 def ensureReading (reader : KeyReader) : IO Unit := do
   unless ← reader.active.get do
@@ -61,6 +77,7 @@ def ensureReading (reader : KeyReader) : IO Unit := do
         reader.result.set (some (← readKey))
       finally
         reader.active.set false
+        reader.signal.notify
 
 end KeyReader
 
@@ -84,6 +101,7 @@ structure Config (Model : Type) where
   multiline : Option MultilineConfig := none
   fallbackSize : Size := { columns := 80, rows := 24 }
   tickMs : UInt32 := 60
+  resizeMs : UInt32 := 250
   view : Model → Size → Text
   complete : Model → TextInputState → IO (List Completion)
   getState : Model → State
@@ -96,9 +114,25 @@ structure Config (Model : Type) where
 def currentSize (fallback : Size) : IO Size := do
   pure ((← terminalSize).getD fallback)
 
-def readKeyWithResize (tickMs : UInt32) (fallback : Size) (screen : Screen)
-    (render : Screen → IO Screen) (wake : IO Bool := pure false)
-    (reader : Option KeyReader := none) : IO (Screen × Option Key) := do
+private def waitForEvent (tickMs : UInt32) (reader : KeyReader)
+    (wakeSignal : Option Std.Notify) : IO Bool := do
+  match wakeSignal with
+  | none =>
+      IO.sleep tickMs
+      pure true
+  | some wakeSignal =>
+      let timer ← (Std.Async.Selector.sleep
+        (Std.Time.Millisecond.Offset.ofNat tickMs.toNat)).block
+      (Std.Async.Selectable.one #[
+        .case reader.signal.selector (fun _ => pure false),
+        .case wakeSignal.selector (fun _ => pure false),
+        .case timer (fun _ => pure true)
+      ]).block
+
+private def readKeyWithResizeAtSize (tickMs : UInt32) (fallback : Size) (screen : Screen)
+    (render : Screen → Size → IO Screen) (wake : IO Bool := pure false)
+    (reader : Option KeyReader := none) (wakeSignal : Option Std.Notify := none) :
+    IO (Screen × Option Key) := do
   let reader ← match reader with
     | some reader => pure reader
     | none => KeyReader.new
@@ -110,11 +144,11 @@ def readKeyWithResize (tickMs : UInt32) (fallback : Size) (screen : Screen)
     if ← wake then
       woken := true
     else
-      let nextSize ← currentSize fallback
-      if nextSize != size then
-        screen ← render screen
-        size := nextSize
-      IO.sleep tickMs
+      if ← waitForEvent tickMs reader wakeSignal then
+        let nextSize ← currentSize fallback
+        if nextSize != size then
+          screen ← render screen nextSize
+          size := nextSize
   if woken then
     pure (screen, none)
   else
@@ -123,13 +157,24 @@ def readKeyWithResize (tickMs : UInt32) (fallback : Size) (screen : Screen)
     reader.active.set false
     pure (screen, key)
 
+def readKeyWithResize (tickMs : UInt32) (fallback : Size) (screen : Screen)
+    (render : Screen → IO Screen) (wake : IO Bool := pure false)
+    (reader : Option KeyReader := none) (wakeSignal : Option Std.Notify := none) :
+    IO (Screen × Option Key) :=
+  readKeyWithResizeAtSize tickMs fallback screen (fun screen _ => render screen)
+    wake reader wakeSignal
+
 private structure JobRuntime (Model : Type) where
   cancellation : Cancellation
   result : IO.Ref (Option (Except String Model))
 
+private def renderAtSize {Model : Type} (config : Config Model) (screen : Screen)
+    (model : Model) (size : Size) : IO Screen :=
+  screen.render (config.view model size)
+
 private def render {Model : Type} (config : Config Model) (screen : Screen)
     (model : Model) : IO Screen := do
-  screen.render (config.view model (← currentSize config.fallbackSize))
+  renderAtSize config screen model (← currentSize config.fallbackSize)
 
 def run {Model : Type} (config : Config Model) : IO Unit := do
   hideCursor
@@ -139,6 +184,8 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
       let mut screen ← Screen.start
       let mut activeJobs : List (JobRuntime Model) := []
       let reader ← KeyReader.new
+      let wakeSignal ← Std.Notify.new
+      let mut dirty := true
       while config.isRunning model do
         let mut pendingJobs : List (JobRuntime Model) := []
         for runtime in activeJobs do
@@ -148,20 +195,26 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
               match config.jobs with
               | some jobs =>
                   model := jobs.finish model nextModel
+                  dirty := true
               | none => pure ()
           | some (.error message) =>
               match config.jobs with
-              | some jobs => model := jobs.fail model message
+              | some jobs =>
+                  model := jobs.fail model message
+                  dirty := true
               | none => pure ()
         activeJobs := pendingJobs.reverse
-        screen ← render config screen model
+        if dirty then
+          screen ← render config screen model
+          dirty := false
         let wake : IO Bool := do
           for runtime in activeJobs do
             if (← runtime.result.get).isSome then
               return true
           pure false
-        let (nextScreen, key) ← readKeyWithResize config.tickMs config.fallbackSize screen
-          (fun screen => render config screen model) wake (some reader)
+        let (nextScreen, key) ← readKeyWithResizeAtSize config.resizeMs config.fallbackSize screen
+          (fun screen size => renderAtSize config screen model size) wake (some reader)
+          (some wakeSignal)
         screen := nextScreen
         match key with
         | none =>
@@ -175,6 +228,7 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                     runtime.cancellation.cancel
                   model := jobs.cancel model
                   activeJobs := []
+                  dirty := true
               | _, _ =>
                   if key == .ctrl 'x' then
                     model := config.quit model
@@ -186,6 +240,7 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                       | none => TermColor.Repl.update config.inputConfig (fun _ => [])
                           currentState key
                     model := config.setState model state
+                    dirty := true
                     if action == .quit then
                       model := config.quit model
             else
@@ -200,6 +255,7 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                 | none => TermColor.Repl.update config.inputConfig
                     (fun _ => candidates) currentState key
               model := config.setState model state
+              dirty := true
               match action with
               | .changed => pure ()
               | .quit => model := config.quit model
@@ -217,12 +273,17 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                               (← jobs.run cancellation started line)))
                           catch error =>
                             result.set (some (.error error.toString))
+                          finally
+                            wakeSignal.notify
                         model := started
                         activeJobs := runtime :: activeJobs
+                        dirty := true
                       else
                         model ← config.submit model line
+                        dirty := true
                   | none =>
                       model ← config.submit model line
+                      dirty := true
   finally
     showCursor
     clearScreen
