@@ -127,8 +127,9 @@ def renderMultilineTextInputBody (config : TextInputConfig) (state : TextInputSt
         let style := Style.combine config.textStyle config.cursorStyle
         Text.styled (String.singleton cursorCharacter) style
       else Text.empty
-    wrapLines (max 1 config.width)
+    let content := wrapLines (max 1 config.width)
       (Text.styled before config.textStyle ++ cursorText ++ Text.styled after config.textStyle)
+    align (max 1 config.width) .left content
 
 def recallUp (state : State) : State :=
   if state.history.isEmpty then state
