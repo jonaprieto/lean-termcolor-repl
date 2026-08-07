@@ -28,6 +28,9 @@ the current `TextInputState`.
 `TermColor.Repl.Terminal` also provides terminal-size lookup and key waiting with live resize
 redraws, plus a callback-driven `run` loop and `suspend` boundary for transient commands.
 
+Persistent history is opt-in through `TermColor.Repl.History`; `loadHistory` and `saveHistory`
+return `Except` values so a missing or unwritable history file does not alter the active session.
+
 ```lean
 import TermColor.Repl
 

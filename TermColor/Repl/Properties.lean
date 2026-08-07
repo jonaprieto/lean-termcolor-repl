@@ -5,6 +5,7 @@ Authors: Jonathan Prieto-Cubides
 -/
 
 import TermColor.Repl
+import TermColor.Repl.History
 
 namespace TermColor.Repl.Properties
 
@@ -16,6 +17,8 @@ private def commandCompletion : TextInputState → List Completion
   | input =>
       ["/help", "/history"].filter (·.startsWith input.value) |>.map
         (fun replacement => { replacement })
+
+private def historyConfig : HistoryConfig := { path := "history", maxEntries := 2 }
 
 example :
     (recallUp { history := #["first", "second"] }).input.value = "second" := by
@@ -39,6 +42,16 @@ example :
 example :
     (update config commandCompletion { input := { value := "2+2", cursor := 3 }} .enter).2 =
       .submit "2+2" := by
+  native_decide
+
+example :
+    normalizeHistory historyConfig [" first ", "", "second", "first", "third"] =
+      #["first", "third"] := by
+  native_decide
+
+example :
+    normalizeHistory { historyConfig with deduplicate := false } ["first", "first"] =
+      #["first", "first"] := by
   native_decide
 
 end TermColor.Repl.Properties

@@ -8,7 +8,7 @@
   [Issue #5](https://github.com/jonaprieto/lean-termcolor-repl/issues/5)
 - [ ] Support multiline input when a real client needs it.
   [Issue #1](https://github.com/jonaprieto/lean-termcolor-repl/issues/1)
-- [ ] Add persistent history only when a client needs history across sessions.
+- [x] Add optional persistent history with explicit empty-line and duplicate handling.
   [Issue #3](https://github.com/jonaprieto/lean-termcolor-repl/issues/3)
 - [ ] Add file completion only when a client needs filesystem candidates.
   [Issue #2](https://github.com/jonaprieto/lean-termcolor-repl/issues/2)
