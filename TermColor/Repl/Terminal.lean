@@ -114,6 +114,7 @@ def readKeyWithResize (tickMs : UInt32) (fallback : Size) (screen : Screen)
   else
     let key := (← reader.result.get).getD none
     reader.result.set none
+    reader.active.set false
     pure (screen, key)
 
 private structure JobRuntime (Model : Type) where
