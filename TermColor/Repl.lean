@@ -20,9 +20,18 @@ open TermColor
 open TermColor.Layout
 open TermColor.Widgets
 
+inductive CompletionKind where
+  | text
+  | file
+  | directory
+  | executable
+deriving Repr, BEq, DecidableEq
+
 structure Completion where
   replacement : String
   label : String := replacement
+  kind : CompletionKind := .text
+  range : Option (Nat × Nat) := none
 deriving Repr, BEq, DecidableEq
 
 structure State where
@@ -105,13 +114,31 @@ private def sharedPrefix : List Completion → String
         (fun shared next => commonPrefix shared next.replacement.toList)
         candidate.replacement.toList
 
+private def applyCompletion (input : TextInputState) (candidate : Completion)
+    (replacement : String := candidate.replacement) : TextInputState :=
+  let chars := input.value.toList
+  let (rawStart, rawStop) := candidate.range.getD (0, chars.length)
+  let start := min rawStart chars.length
+  let stop := max start (min rawStop chars.length)
+  let value := String.ofList
+    (chars.take start ++ replacement.toList ++ chars.drop stop)
+  { value, cursor := start + replacement.toList.length }
+
+private def completionRange (input : TextInputState) (candidate : Completion) : Nat × Nat :=
+  let length := input.value.toList.length
+  let (rawStart, rawStop) := candidate.range.getD (0, length)
+  (min rawStart length, max (min rawStart length) (min rawStop length))
+
 def completeInput (input : TextInputState) (candidates : List Completion) : TextInputState :=
   match candidates with
   | [] => input
-  | [candidate] => inputState candidate.replacement
-  | candidates =>
+  | [candidate] => applyCompletion input candidate
+  | candidate :: rest =>
+      let candidates := candidate :: rest
       let shared := sharedPrefix candidates
-      if shared.length > input.value.length then inputState shared else input
+      let (start, stop) := completionRange input candidate
+      let current := String.ofList (input.value.toList.drop start |>.take (stop - start))
+      if shared.length > current.length then applyCompletion input candidate shared else input
 
 def renderMultilineTextInputBody (config : TextInputConfig) (state : TextInputState)
     (focused : Bool := false) : Text :=
@@ -180,7 +207,8 @@ def updateMultiline (config : MultilineConfig) (complete : TextInputState → Li
           input := {}
           history := state.history.push line
           historyIndex := none }, .submit line)
-  | .escape => (state, .quit)
+  | .escape =>
+      (state, .quit)
   | key =>
       ({ state with
         input := updateMultilineInput config key state.input
@@ -205,7 +233,8 @@ def update (config : TextInputConfig) (complete : TextInputState → List Comple
           input := {}
           history := state.history.push line
           historyIndex := none }, .submit line)
-  | .escape => (state, .quit)
+  | .escape =>
+      (state, .quit)
   | key =>
       ({ state with
         input := updateTextInput config key state.input

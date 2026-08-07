@@ -28,7 +28,7 @@ structure Config (Model : Type) where
   fallbackSize : Size := { columns := 80, rows := 24 }
   tickMs : UInt32 := 60
   view : Model → Size → Text
-  complete : Model → TextInputState → List Completion
+  complete : Model → TextInputState → IO (List Completion)
   getState : Model → State
   setState : Model → State → Model
   submit : Screen → Model → String → IO (Screen × Model)
@@ -71,11 +71,16 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
         match key with
         | none => model := config.quit model
         | some key =>
+            let currentState := config.getState model
+            let candidates ← if key == .tab then
+                config.complete model currentState.input
+              else
+                pure []
             let (state, action) := match config.multiline with
               | some multiline => TermColor.Repl.updateMultiline multiline
-                  (config.complete model) (config.getState model) key
+                  (fun _ => candidates) currentState key
               | none => TermColor.Repl.update config.inputConfig
-                  (config.complete model) (config.getState model) key
+                  (fun _ => candidates) currentState key
             model := config.setState model state
             match action with
             | .changed => pure ()

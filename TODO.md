@@ -10,7 +10,7 @@
   [Issue #1](https://github.com/jonaprieto/lean-termcolor-repl/issues/1)
 - [x] Add optional persistent history with explicit empty-line and duplicate handling.
   [Issue #3](https://github.com/jonaprieto/lean-termcolor-repl/issues/3)
-- [ ] Add file completion only when a client needs filesystem candidates.
+- [x] Add bounded, hidden-file-aware completion for filesystem candidates.
   [Issue #2](https://github.com/jonaprieto/lean-termcolor-repl/issues/2)
 - [ ] Add completion menus or fuzzy matching only after a second client establishes
   the interaction requirements.

@@ -54,12 +54,14 @@ jobs:
           lake -d docbuild update
           lake -d docbuild build TermColor.Repl
           lake -d docbuild build TermColor.Repl.Terminal
+          lake -d docbuild build TermColor.Repl.FileCompletion
           mkdir -p .lake/packages/termcolor/.lake/build/lib/lean/TermColor
           cp -R .lake/packages/termcolor-layout/.lake/build/lib/lean/TermColor/. .lake/packages/termcolor/.lake/build/lib/lean/TermColor/
           cp -R .lake/packages/termcolor-widgets/.lake/build/lib/lean/TermColor/. .lake/packages/termcolor/.lake/build/lib/lean/TermColor/
           cp -R .lake/packages/termcolor-terminal/.lake/build/lib/lean/TermColor/. .lake/packages/termcolor/.lake/build/lib/lean/TermColor/
           cp -R .lake/build/lib/lean/TermColor/. .lake/packages/termcolor/.lake/build/lib/lean/TermColor/
           lake -d docbuild build TermColor.Repl:docs TermColor.Repl.Terminal:docs
+          lake -d docbuild build TermColor.Repl.FileCompletion:docs
           touch docbuild/.lake/build/doc/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

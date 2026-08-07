@@ -42,6 +42,11 @@ example :
   native_decide
 
 example :
+    (completeInput { value := "/load ma.txt", cursor := 12 }
+      [{ replacement := "main.lean", range := some (6, 12) }]).value = "/load main.lean" := by
+  native_decide
+
+example :
     (update config commandCompletion { input := { value := "2+2", cursor := 3 }} .enter).2 =
       .submit "2+2" := by
   native_decide

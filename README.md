@@ -28,6 +28,10 @@ the current `TextInputState`.
 `TermColor.Repl.Terminal` also provides terminal-size lookup and key waiting with live resize
 redraws, plus a callback-driven `run` loop and `suspend` boundary for transient commands.
 
+`TermColor.Repl.FileCompletion` provides bounded, hidden-file-aware completion for the token under
+the cursor. Terminal callbacks return `IO (List Completion)` so filesystem candidates are read only
+when the user presses tab.
+
 Pass `MultilineConfig` to `TermColor.Repl.Terminal.Config.multiline` to opt into multiline input;
 the configured line-break key inserts a newline while enter still submits one logical history item.
 
