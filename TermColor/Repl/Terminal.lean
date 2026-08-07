@@ -157,13 +157,6 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
         | none =>
             if job.isNone then
               model := config.quit model
-            else
-              match job with
-              | some runtime =>
-                  runtime.cancellation.cancel
-                  model := config.quit model
-                  job := none
-              | none => pure ()
         | some key =>
             if key == .escape || key == .ctrl 'x' then
               match config.jobs, job with
