@@ -64,6 +64,12 @@ def ensureReading (reader : KeyReader) : IO Unit := do
 
 end KeyReader
 
+/-- Configuration for cooperative background jobs.
+
+Multiple submitted lines may run at the same time. The renderer remains the
+owner of `Model` and `Screen`; each worker returns a snapshot which is merged
+through `finish` when its result is drained.
+-/
 structure JobConfig (Model : Type) where
   shouldRun : Model → String → Bool := fun _ _ => true
   start : Model → String → Model
@@ -131,39 +137,45 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
     withRawInput do
       let mut model := config.initial
       let mut screen ← Screen.start
-      let mut job : Option (JobRuntime Model) := none
+      let mut activeJobs : List (JobRuntime Model) := []
       let reader ← KeyReader.new
       while config.isRunning model do
-        match config.jobs, job with
-        | some jobs, some runtime =>
-            match ← runtime.result.get with
-            | none => pure ()
-            | some (.ok (nextScreen, nextModel)) =>
-                model := jobs.finish model nextModel
-                screen := nextScreen
-                job := none
-            | some (.error message) =>
-                model := jobs.fail model message
-                job := none
-        | _, _ => pure ()
+        let mut pendingJobs : List (JobRuntime Model) := []
+        for runtime in activeJobs do
+          match ← runtime.result.get with
+          | none => pendingJobs := runtime :: pendingJobs
+          | some (.ok (nextScreen, nextModel)) =>
+              match config.jobs with
+              | some jobs =>
+                  model := jobs.finish model nextModel
+                  screen := nextScreen
+              | none => pure ()
+          | some (.error message) =>
+              match config.jobs with
+              | some jobs => model := jobs.fail model message
+              | none => pure ()
+        activeJobs := pendingJobs.reverse
         screen ← render config screen model
-        let wake : IO Bool := match job with
-          | some runtime => do pure (← runtime.result.get).isSome
-          | none => pure false
+        let wake : IO Bool := do
+          for runtime in activeJobs do
+            if (← runtime.result.get).isSome then
+              return true
+          pure false
         let (nextScreen, key) ← readKeyWithResize config.tickMs config.fallbackSize screen
           (fun screen => render config screen model) wake (some reader)
         screen := nextScreen
         match key with
         | none =>
-            if job.isNone then
+            if activeJobs.isEmpty then
               model := config.quit model
         | some key =>
             if key == .escape || key == .ctrl 'x' then
-              match config.jobs, job with
-              | some jobs, some runtime =>
-                  runtime.cancellation.cancel
+              match config.jobs, activeJobs.isEmpty with
+              | some jobs, false =>
+                  for runtime in activeJobs do
+                    runtime.cancellation.cancel
                   model := jobs.cancel model
-                  job := none
+                  activeJobs := []
               | _, _ =>
                   if key == .ctrl 'x' then
                     model := config.quit model
@@ -188,37 +200,34 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                     (fun _ => candidates) currentState key
                 | none => TermColor.Repl.update config.inputConfig
                     (fun _ => candidates) currentState key
-              match job, action with
-              | some _, .submit _ => pure ()
-              | _, _ =>
-                  model := config.setState model state
-                  match action with
-                  | .changed => pure ()
-                  | .quit => model := config.quit model
-                  | .submit line =>
-                      match config.jobs with
-                      | some jobs =>
-                          if jobs.shouldRun model line then
-                            let cancellation ← Cancellation.new
-                            let result ← IO.mkRef none
-                            let started := jobs.start model line
-                            let runtime : JobRuntime Model := { cancellation, result }
-                            let _task ← IO.asTask do
-                              try
-                                result.set (some (.ok
-                                  (← jobs.run cancellation screen started line)))
-                              catch error =>
-                                result.set (some (.error error.toString))
-                            model := started
-                            job := some runtime
-                          else
-                            let (nextScreen, nextModel) ← config.submit screen model line
-                            screen := nextScreen
-                            model := nextModel
-                      | none =>
-                          let (nextScreen, nextModel) ← config.submit screen model line
-                          screen := nextScreen
-                          model := nextModel
+              model := config.setState model state
+              match action with
+              | .changed => pure ()
+              | .quit => model := config.quit model
+              | .submit line =>
+                  match config.jobs with
+                  | some jobs =>
+                      if jobs.shouldRun model line then
+                        let cancellation ← Cancellation.new
+                        let result ← IO.mkRef none
+                        let started := jobs.start model line
+                        let runtime : JobRuntime Model := { cancellation, result }
+                        let _task ← IO.asTask do
+                          try
+                            result.set (some (.ok
+                              (← jobs.run cancellation screen started line)))
+                          catch error =>
+                            result.set (some (.error error.toString))
+                        model := started
+                        activeJobs := runtime :: activeJobs
+                      else
+                        let (nextScreen, nextModel) ← config.submit screen model line
+                        screen := nextScreen
+                        model := nextModel
+                  | none =>
+                      let (nextScreen, nextModel) ← config.submit screen model line
+                      screen := nextScreen
+                      model := nextModel
   finally
     showCursor
     clearScreen

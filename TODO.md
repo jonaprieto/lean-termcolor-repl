@@ -19,6 +19,8 @@
   [Issue #4](https://github.com/jonaprieto/lean-termcolor-repl/issues/4)
 - [x] Add one cooperative background job with cancellation and result wake-up.
   [Issue #8](https://github.com/jonaprieto/lean-termcolor-repl/issues/8)
+- [x] Support multiple concurrent background jobs with renderer-owned completion draining.
+  [Issue #11](https://github.com/jonaprieto/lean-termcolor-repl/issues/11)
 
 ## Versioned roadmap
 
