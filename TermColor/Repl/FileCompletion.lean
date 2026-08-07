@@ -36,7 +36,8 @@ private def tokenRange (input : TextInputState) : Nat × Nat :=
   let chars := input.value.toList
   let cursor := min input.cursor chars.length
   let start := tokenStart chars cursor
-  let stop := cursor + ((chars.drop cursor).takeWhile (fun character => !whitespace character)).length
+  let stop := cursor +
+    ((chars.drop cursor).takeWhile (fun character => !whitespace character)).length
   (start, stop)
 
 private def safeReadDir (directory : System.FilePath) : IO (Array IO.FS.DirEntry) :=
@@ -58,7 +59,8 @@ private def completionFor (token : String) (start stop : Nat)
     kind := if isDirectory then .directory else .file
     range := some (start, stop) }
 
-def fileCompletions (config : FileCompletionConfig) (input : TextInputState) : IO (List Completion) := do
+def fileCompletions (config : FileCompletionConfig) (input : TextInputState) :
+    IO (List Completion) := do
   if config.maxCandidates == 0 then
     return []
   let (start, stop) := tokenRange input
@@ -71,7 +73,8 @@ def fileCompletions (config : FileCompletionConfig) (input : TextInputState) : I
     if (config.includeHidden || !entry.fileName.startsWith "." || fragment.startsWith ".") &&
         entry.fileName.startsWith fragment then
       completions := (← completionFor token start stop entry directory) :: completions
-  pure ((completions.mergeSort (fun left right => left.label < right.label)).take config.maxCandidates)
+  pure ((completions.mergeSort (fun left right => left.label < right.label)).take
+    config.maxCandidates)
 
 def defaultFileCompletions (input : TextInputState) : IO (List Completion) :=
   fileCompletions {} input
