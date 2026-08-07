@@ -58,7 +58,7 @@ example :
 
 example :
     (updateMultiline multilineConfig (fun _ => [])
-      { input := { value := "1+2", cursor := 3 }} (.ctrl 'o')).1.input.value = "1+2\n" := by
+      { input := { value := "1+2", cursor := 3 }} (.ctrl 'n')).1.input.value = "1+2\n" := by
   native_decide
 
 example :

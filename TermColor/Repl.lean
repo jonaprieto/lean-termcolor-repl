@@ -33,7 +33,7 @@ deriving Repr
 
 structure MultilineConfig where
   text : TextInputConfig := {}
-  lineBreak : Key := .ctrl 'o'
+  lineBreak : Key := .ctrl 'n'
 deriving Repr
 
 inductive Action where
