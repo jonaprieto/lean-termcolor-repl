@@ -33,3 +33,4 @@
 
 - [x] Add generated API documentation workflow.
 - [x] Publish the `0.1.0` tagged release.
+- [ ] Publish `0.2.0` with multiline input.
