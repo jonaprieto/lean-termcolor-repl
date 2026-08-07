@@ -47,6 +47,16 @@ example :
   native_decide
 
 example :
+    (update config commandCompletion { input := { value := "/", cursor := 1 }} .tab).1.completion =
+      some { candidates := #[{ replacement := "/help" }, { replacement := "/history" }] } := by
+  native_decide
+
+example :
+    (renderCompletionMenu { width := 8 } { candidates := #[{ replacement := "long" }] }).plainText
+      |>.splitOn "\n" |>.all (·.length ≤ 8) := by
+  native_decide
+
+example :
     (update config commandCompletion { input := { value := "2+2", cursor := 3 }} .enter).2 =
       .submit "2+2" := by
   native_decide

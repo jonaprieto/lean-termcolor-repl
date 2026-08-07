@@ -72,7 +72,7 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
         | none => model := config.quit model
         | some key =>
             let currentState := config.getState model
-            let candidates ← if key == .tab then
+            let candidates ← if key == .tab && currentState.completion.isNone then
                 config.complete model currentState.input
               else
                 pure []

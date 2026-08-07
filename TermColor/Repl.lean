@@ -34,10 +34,24 @@ structure Completion where
   range : Option (Nat × Nat) := none
 deriving Repr, BEq, DecidableEq
 
+structure CompletionMenu where
+  candidates : Array Completion
+  selected : Nat := 0
+deriving Repr, BEq, DecidableEq
+
+structure CompletionMenuConfig where
+  width : Nat := 80
+  maxItems : Nat := 8
+  selectedStyle : Style := Style.reverse
+  textStyle : Style := {}
+  kindStyle : Style := Style.dim
+deriving Repr
+
 structure State where
   input : TextInputState := {}
   history : Array String := #[]
   historyIndex : Option Nat := none
+  completion : Option CompletionMenu := none
 deriving Repr
 
 structure MultilineConfig where
@@ -158,6 +172,66 @@ def renderMultilineTextInputBody (config : TextInputConfig) (state : TextInputSt
       (Text.styled before config.textStyle ++ cursorText ++ Text.styled after config.textStyle)
     align (max 1 config.width) .left content
 
+private def completionKindLabel : CompletionKind → String
+  | .text => "  "
+  | .file => "ƒ "
+  | .directory => "▸ "
+  | .executable => "⚙ "
+
+/-- Render a width-bounded completion menu with a selected row and kind markers. -/
+def renderCompletionMenu (config : CompletionMenuConfig) (menu : CompletionMenu) : Text :=
+  let width := max 1 config.width
+  let count := min config.maxItems menu.candidates.size
+  let rows := (List.range count).filterMap fun index => do
+    let candidate ← menu.candidates[index]?
+    let marker := if index == menu.selected then "› " else "  "
+    let row := marker ++ completionKindLabel candidate.kind ++ candidate.label
+    let style := if index == menu.selected then config.selectedStyle else config.textStyle
+    pure (truncate width (Text.styled row style))
+  let more := if menu.candidates.size > count then
+      [Text.styled s!"  … {menu.candidates.size - count} more" config.kindStyle]
+    else []
+  align width .left (joinLines (rows ++ more))
+
+private def selectCompletion (state : State) (selected : Nat) : State :=
+  match state.completion with
+  | none => state
+  | some menu =>
+      match menu.candidates[selected]? with
+      | none => state
+      | some candidate =>
+          { state with
+            input := applyCompletion state.input candidate
+            completion := some { menu with selected } }
+
+private def cycleCompletion (state : State) (forward : Bool) : State :=
+  match state.completion with
+  | some menu =>
+      if menu.candidates.isEmpty then state
+      else
+        let selected := if forward then
+            (menu.selected + 1) % menu.candidates.size
+          else if menu.selected == 0 then menu.candidates.size - 1 else menu.selected - 1
+        selectCompletion state selected
+  | none => state
+
+private def completeWith (state : State) (candidates : List Completion) : State :=
+  match candidates with
+  | [] => { state with completion := none }
+  | [_] => { state with
+      input := completeInput state.input candidates
+      historyIndex := none
+      completion := none }
+  | _ => { state with
+      input := completeInput state.input candidates
+      historyIndex := none
+      completion := some { candidates := candidates.toArray } }
+
+private def acceptCompletion (state : State) : State :=
+  match state.completion with
+  | none => state
+  | some menu => selectCompletion state menu.selected
+
 def recallUp (state : State) : State :=
   if state.history.isEmpty then state
   else
@@ -184,21 +258,26 @@ def updateMultiline (config : MultilineConfig) (complete : TextInputState → Li
     (state : State) (key : Key) : State × Action :=
   match key with
   | .up =>
-      if hasNewline state.input then
+      if state.completion.isSome then
+        (cycleCompletion state false, .changed)
+      else if hasNewline state.input then
         ({ state with input := moveVertical true state.input }, .changed)
       else
         (recallUp state, .changed)
   | .down =>
-      if hasNewline state.input then
+      if state.completion.isSome then
+        (cycleCompletion state true, .changed)
+      else if hasNewline state.input then
         ({ state with input := moveVertical false state.input }, .changed)
       else
         (recallDown state, .changed)
   | .tab =>
-      ({ state with
-        input := completeInput state.input (complete state.input)
-        historyIndex := none },
-        .changed)
+      if state.completion.isSome then
+        (cycleCompletion state true, .changed)
+      else
+        (completeWith state (complete state.input), .changed)
   | .enter =>
+      let state := { acceptCompletion state with completion := none }
       let line := state.input.value.trimAscii.toString
       if line.isEmpty then
         ({ state with input := {}, historyIndex := none }, .changed)
@@ -208,23 +287,32 @@ def updateMultiline (config : MultilineConfig) (complete : TextInputState → Li
           history := state.history.push line
           historyIndex := none }, .submit line)
   | .escape =>
-      (state, .quit)
+      if state.completion.isSome then
+        ({ state with completion := none }, .changed)
+      else
+        (state, .quit)
   | key =>
       ({ state with
         input := updateMultilineInput config key state.input
-        historyIndex := none }, .changed)
+        historyIndex := none
+        completion := none }, .changed)
 
 def update (config : TextInputConfig) (complete : TextInputState → List Completion)
     (state : State) (key : Key) : State × Action :=
   match key with
-  | .up => (recallUp state, .changed)
-  | .down => (recallDown state, .changed)
+  | .up =>
+      if state.completion.isSome then (cycleCompletion state false, .changed)
+      else (recallUp state, .changed)
+  | .down =>
+      if state.completion.isSome then (cycleCompletion state true, .changed)
+      else (recallDown state, .changed)
   | .tab =>
-      ({ state with
-        input := completeInput state.input (complete state.input)
-        historyIndex := none },
-        .changed)
+      if state.completion.isSome then
+        (cycleCompletion state true, .changed)
+      else
+        (completeWith state (complete state.input), .changed)
   | .enter =>
+      let state := { acceptCompletion state with completion := none }
       let line := state.input.value.trimAscii.toString
       if line.isEmpty then
         ({ state with input := {}, historyIndex := none }, .changed)
@@ -234,10 +322,14 @@ def update (config : TextInputConfig) (complete : TextInputState → List Comple
           history := state.history.push line
           historyIndex := none }, .submit line)
   | .escape =>
-      (state, .quit)
+      if state.completion.isSome then
+        ({ state with completion := none }, .changed)
+      else
+        (state, .quit)
   | key =>
       ({ state with
         input := updateTextInput config key state.input
-        historyIndex := none }, .changed)
+        historyIndex := none
+        completion := none }, .changed)
 
 end TermColor.Repl

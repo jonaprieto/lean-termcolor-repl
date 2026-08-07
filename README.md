@@ -32,6 +32,9 @@ redraws, plus a callback-driven `run` loop and `suspend` boundary for transient 
 the cursor. Terminal callbacks return `IO (List Completion)` so filesystem candidates are read only
 when the user presses tab.
 
+Multiple candidates stay in a bounded `CompletionMenu`; tab and arrow keys select candidates, enter
+accepts the selection, and escape dismisses it.
+
 Pass `MultilineConfig` to `TermColor.Repl.Terminal.Config.multiline` to opt into multiline input;
 the configured line-break key inserts a newline while enter still submits one logical history item.
 

@@ -12,9 +12,8 @@
   [Issue #3](https://github.com/jonaprieto/lean-termcolor-repl/issues/3)
 - [x] Add bounded, hidden-file-aware completion for filesystem candidates.
   [Issue #2](https://github.com/jonaprieto/lean-termcolor-repl/issues/2)
-- [ ] Add completion menus or fuzzy matching only after a second client establishes
-  the interaction requirements.
--  [Issue #7](https://github.com/jonaprieto/lean-termcolor-repl/issues/7)
+- [x] Add a bounded completion menu with keyboard selection.
+  [Issue #7](https://github.com/jonaprieto/lean-termcolor-repl/issues/7)
 - [ ] Revisit selectable Vi/Emacs editing modes when the underlying widget layer
   exposes the required key semantics. Closed for now.
   [Issue #4](https://github.com/jonaprieto/lean-termcolor-repl/issues/4)
