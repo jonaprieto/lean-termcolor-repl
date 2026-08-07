@@ -15,12 +15,19 @@
 - [ ] Add completion menus or fuzzy matching only after a second client establishes
   the interaction requirements.
 -  [Issue #7](https://github.com/jonaprieto/lean-termcolor-repl/issues/7)
-- [ ] Add selectable Vi/Emacs editing modes only when the underlying widget layer
-  exposes the required key semantics.
--  [Issue #4](https://github.com/jonaprieto/lean-termcolor-repl/issues/4)
+- [ ] Revisit selectable Vi/Emacs editing modes when the underlying widget layer
+  exposes the required key semantics. Closed for now.
+  [Issue #4](https://github.com/jonaprieto/lean-termcolor-repl/issues/4)
 - [ ] Add background jobs and cancellation only when a client has long-running
   concurrent commands.
   [Issue #8](https://github.com/jonaprieto/lean-termcolor-repl/issues/8)
+
+## Versioned roadmap
+
+- `0.2.0`: multiline input ([Issue #1](https://github.com/jonaprieto/lean-termcolor-repl/issues/1))
+- `0.3.0`: file completion ([Issue #2](https://github.com/jonaprieto/lean-termcolor-repl/issues/2))
+- `0.4.0`: completion presentation ([Issue #7](https://github.com/jonaprieto/lean-termcolor-repl/issues/7))
+- `0.5.0`: background jobs ([Issue #8](https://github.com/jonaprieto/lean-termcolor-repl/issues/8))
 
 ## Release
 

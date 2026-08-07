@@ -28,6 +28,9 @@ the current `TextInputState`.
 `TermColor.Repl.Terminal` also provides terminal-size lookup and key waiting with live resize
 redraws, plus a callback-driven `run` loop and `suspend` boundary for transient commands.
 
+Pass `MultilineConfig` to `TermColor.Repl.Terminal.Config.multiline` to opt into multiline input;
+the configured line-break key inserts a newline while enter still submits one logical history item.
+
 Persistent history is opt-in through `TermColor.Repl.History`; `loadHistory` and `saveHistory`
 return `Except` values so a missing or unwritable history file does not alter the active session.
 

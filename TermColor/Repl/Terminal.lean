@@ -24,6 +24,7 @@ open TermColor.Widgets
 structure Config (Model : Type) where
   initial : Model
   inputConfig : TextInputConfig
+  multiline : Option MultilineConfig := none
   fallbackSize : Size := { columns := 80, rows := 24 }
   tickMs : UInt32 := 60
   view : Model → Size → Text
@@ -70,8 +71,11 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
         match key with
         | none => model := config.quit model
         | some key =>
-            let (state, action) := TermColor.Repl.update config.inputConfig
-              (config.complete model) (config.getState model) key
+            let (state, action) := match config.multiline with
+              | some multiline => TermColor.Repl.updateMultiline multiline
+                  (config.complete model) (config.getState model) key
+              | none => TermColor.Repl.update config.inputConfig
+                  (config.complete model) (config.getState model) key
             model := config.setState model state
             match action with
             | .changed => pure ()

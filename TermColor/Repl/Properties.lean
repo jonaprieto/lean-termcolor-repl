@@ -20,6 +20,8 @@ private def commandCompletion : TextInputState → List Completion
 
 private def historyConfig : HistoryConfig := { path := "history", maxEntries := 2 }
 
+private def multilineConfig : MultilineConfig := { text := config }
+
 example :
     (recallUp { history := #["first", "second"] }).input.value = "second" := by
   native_decide
@@ -52,6 +54,21 @@ example :
 example :
     normalizeHistory { historyConfig with deduplicate := false } ["first", "first"] =
       #["first", "first"] := by
+  native_decide
+
+example :
+    (updateMultiline multilineConfig (fun _ => [])
+      { input := { value := "1+2", cursor := 3 }} (.ctrl 'o')).1.input.value = "1+2\n" := by
+  native_decide
+
+example :
+    (updateMultiline multilineConfig (fun _ => [])
+      { input := { value := "a\nbc", cursor := 4 }} .up).1.input.cursor = 1 := by
+  native_decide
+
+example :
+    (updateMultiline multilineConfig (fun _ => [])
+      { input := { value := "a\nb", cursor := 3 }} .enter).2 = .submit "a\nb" := by
   native_decide
 
 end TermColor.Repl.Properties
