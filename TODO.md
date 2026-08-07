@@ -17,8 +17,7 @@
 - [ ] Revisit selectable Vi/Emacs editing modes when the underlying widget layer
   exposes the required key semantics. Closed for now.
   [Issue #4](https://github.com/jonaprieto/lean-termcolor-repl/issues/4)
-- [ ] Add background jobs and cancellation only when a client has long-running
-  concurrent commands.
+- [x] Add one cooperative background job with cancellation and result wake-up.
   [Issue #8](https://github.com/jonaprieto/lean-termcolor-repl/issues/8)
 
 ## Versioned roadmap
