@@ -67,13 +67,13 @@ end KeyReader
 /-- Configuration for cooperative background jobs.
 
 Multiple submitted lines may run at the same time. The renderer remains the
-owner of `Model` and `Screen`; each worker returns a snapshot which is merged
-through `finish` when its result is drained.
+owner of `Model` and `Screen`; each worker returns only model state which is
+merged through `finish` when its result is drained.
 -/
 structure JobConfig (Model : Type) where
   shouldRun : Model → String → Bool := fun _ _ => true
   start : Model → String → Model
-  run : Cancellation → Screen → Model → String → IO (Screen × Model)
+  run : Cancellation → Model → String → IO Model
   finish : Model → Model → Model := fun _ completed => completed
   cancel : Model → Model := id
   fail : Model → String → Model := fun model _ => model
@@ -88,7 +88,7 @@ structure Config (Model : Type) where
   complete : Model → TextInputState → IO (List Completion)
   getState : Model → State
   setState : Model → State → Model
-  submit : Screen → Model → String → IO (Screen × Model)
+  submit : Model → String → IO Model
   jobs : Option (JobConfig Model) := none
   isRunning : Model → Bool
   quit : Model → Model
@@ -125,7 +125,7 @@ def readKeyWithResize (tickMs : UInt32) (fallback : Size) (screen : Screen)
 
 private structure JobRuntime (Model : Type) where
   cancellation : Cancellation
-  result : IO.Ref (Option (Except String (Screen × Model)))
+  result : IO.Ref (Option (Except String Model))
 
 private def render {Model : Type} (config : Config Model) (screen : Screen)
     (model : Model) : IO Screen := do
@@ -144,11 +144,10 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
         for runtime in activeJobs do
           match ← runtime.result.get with
           | none => pendingJobs := runtime :: pendingJobs
-          | some (.ok (nextScreen, nextModel)) =>
+          | some (.ok nextModel) =>
               match config.jobs with
               | some jobs =>
                   model := jobs.finish model nextModel
-                  screen := nextScreen
               | none => pure ()
           | some (.error message) =>
               match config.jobs with
@@ -215,19 +214,15 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                         let _task ← IO.asTask do
                           try
                             result.set (some (.ok
-                              (← jobs.run cancellation screen started line)))
+                              (← jobs.run cancellation started line)))
                           catch error =>
                             result.set (some (.error error.toString))
                         model := started
                         activeJobs := runtime :: activeJobs
                       else
-                        let (nextScreen, nextModel) ← config.submit screen model line
-                        screen := nextScreen
-                        model := nextModel
+                        model ← config.submit model line
                   | none =>
-                      let (nextScreen, nextModel) ← config.submit screen model line
-                      screen := nextScreen
-                      model := nextModel
+                      model ← config.submit model line
   finally
     showCursor
     clearScreen
