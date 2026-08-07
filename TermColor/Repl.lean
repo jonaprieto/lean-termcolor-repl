@@ -232,6 +232,39 @@ private def acceptCompletion (state : State) : State :=
   | none => state
   | some menu => selectCompletion state menu.selected
 
+private def updateCommon (complete : TextInputState → List Completion)
+    (up down : State → State)
+    (inputUpdate : Key → TextInputState → TextInputState)
+    (state : State) (key : Key) : State × Action :=
+  match key with
+  | .up =>
+      (if state.completion.isSome then cycleCompletion state false else up state, .changed)
+  | .down =>
+      (if state.completion.isSome then cycleCompletion state true else down state, .changed)
+  | .tab =>
+      (if state.completion.isSome then cycleCompletion state true
+       else completeWith state (complete state.input), .changed)
+  | .enter =>
+      let state := { acceptCompletion state with completion := none }
+      let line := state.input.value.trimAscii.toString
+      if line.isEmpty then
+        ({ state with input := {}, historyIndex := none }, .changed)
+      else
+        ({ state with
+          input := {}
+          history := state.history.push line
+          historyIndex := none }, .submit line)
+  | .escape =>
+      if state.completion.isSome then
+        ({ state with completion := none }, .changed)
+      else
+        (state, .quit)
+  | key =>
+      ({ state with
+        input := inputUpdate key state.input
+        historyIndex := none
+        completion := none }, .changed)
+
 def recallUp (state : State) : State :=
   if state.history.isEmpty then state
   else
@@ -256,80 +289,20 @@ def recallDown (state : State) : State :=
 
 def updateMultiline (config : MultilineConfig) (complete : TextInputState → List Completion)
     (state : State) (key : Key) : State × Action :=
-  match key with
-  | .up =>
-      if state.completion.isSome then
-        (cycleCompletion state false, .changed)
-      else if hasNewline state.input then
-        ({ state with input := moveVertical true state.input }, .changed)
-      else
-        (recallUp state, .changed)
-  | .down =>
-      if state.completion.isSome then
-        (cycleCompletion state true, .changed)
-      else if hasNewline state.input then
-        ({ state with input := moveVertical false state.input }, .changed)
-      else
-        (recallDown state, .changed)
-  | .tab =>
-      if state.completion.isSome then
-        (cycleCompletion state true, .changed)
-      else
-        (completeWith state (complete state.input), .changed)
-  | .enter =>
-      let state := { acceptCompletion state with completion := none }
-      let line := state.input.value.trimAscii.toString
-      if line.isEmpty then
-        ({ state with input := {}, historyIndex := none }, .changed)
-      else
-        ({ state with
-          input := {}
-          history := state.history.push line
-          historyIndex := none }, .submit line)
-  | .escape =>
-      if state.completion.isSome then
-        ({ state with completion := none }, .changed)
-      else
-        (state, .quit)
-  | key =>
-      ({ state with
-        input := updateMultilineInput config key state.input
-        historyIndex := none
-        completion := none }, .changed)
+  updateCommon complete
+    (fun state =>
+      if hasNewline state.input then
+        { state with input := moveVertical true state.input }
+      else recallUp state)
+    (fun state =>
+      if hasNewline state.input then
+        { state with input := moveVertical false state.input }
+      else recallDown state)
+    (fun key input => updateMultilineInput config key input) state key
 
 def update (config : TextInputConfig) (complete : TextInputState → List Completion)
     (state : State) (key : Key) : State × Action :=
-  match key with
-  | .up =>
-      if state.completion.isSome then (cycleCompletion state false, .changed)
-      else (recallUp state, .changed)
-  | .down =>
-      if state.completion.isSome then (cycleCompletion state true, .changed)
-      else (recallDown state, .changed)
-  | .tab =>
-      if state.completion.isSome then
-        (cycleCompletion state true, .changed)
-      else
-        (completeWith state (complete state.input), .changed)
-  | .enter =>
-      let state := { acceptCompletion state with completion := none }
-      let line := state.input.value.trimAscii.toString
-      if line.isEmpty then
-        ({ state with input := {}, historyIndex := none }, .changed)
-      else
-        ({ state with
-          input := {}
-          history := state.history.push line
-          historyIndex := none }, .submit line)
-  | .escape =>
-      if state.completion.isSome then
-        ({ state with completion := none }, .changed)
-      else
-        (state, .quit)
-  | key =>
-      ({ state with
-        input := updateTextInput config key state.input
-        historyIndex := none
-        completion := none }, .changed)
+  updateCommon complete recallUp recallDown
+    (fun key input => updateTextInput config key input) state key
 
 end TermColor.Repl
