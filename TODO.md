@@ -32,3 +32,6 @@
 - [x] Add generated API documentation workflow.
 - [x] Publish the `0.1.0` tagged release.
 - [x] Publish the `0.2.0` tagged release with multiline input.
+- [x] Publish the `0.3.0` tagged release with filesystem completion.
+- [x] Publish the `0.4.0` tagged release with completion menus.
+- [x] Publish the `0.5.0` tagged release with background jobs.
