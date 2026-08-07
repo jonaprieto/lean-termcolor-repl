@@ -68,7 +68,7 @@ completion adapts naturally from commands to command options without knowing eit
 
 ```sh
 lake build TermColor.Repl
-python3 scripts/style-check.py
+pre-commit run --all-files
 ```
 
 See [TODO.md](TODO.md) for intentionally deferred features.
