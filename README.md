@@ -37,7 +37,7 @@ accepts the selection, and escape dismisses it.
 
 Applications can set `Terminal.Config.jobs` to a `JobConfig` for one cooperative background job.
 The runner keeps editing and resize redraws live, wakes when the result arrives, and calls the
-configured cancellation callback when escape is pressed.
+ configured cancellation callback when escape or ctrl-c is pressed.
 
 Pass `MultilineConfig` to `TermColor.Repl.Terminal.Config.multiline` to opt into multiline input;
 the configured line-break key inserts a newline while enter still submits one logical history item.

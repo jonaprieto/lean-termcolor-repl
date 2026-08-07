@@ -164,22 +164,25 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                   job := none
               | none => pure ()
         | some key =>
-            if key == .escape then
+            if key == .escape || key == .ctrl 'c' then
               match config.jobs, job with
               | some jobs, some runtime =>
                   runtime.cancellation.cancel
                   model := jobs.cancel model
                   job := none
               | _, _ =>
-                  let currentState := config.getState model
-                  let (state, action) := match config.multiline with
-                    | some multiline => TermColor.Repl.updateMultiline multiline (fun _ => [])
-                        currentState key
-                    | none => TermColor.Repl.update config.inputConfig (fun _ => [])
-                        currentState key
-                  model := config.setState model state
-                  if action == .quit then
+                  if key == .ctrl 'c' then
                     model := config.quit model
+                  else
+                    let currentState := config.getState model
+                    let (state, action) := match config.multiline with
+                      | some multiline => TermColor.Repl.updateMultiline multiline (fun _ => [])
+                          currentState key
+                      | none => TermColor.Repl.update config.inputConfig (fun _ => [])
+                          currentState key
+                    model := config.setState model state
+                    if action == .quit then
+                      model := config.quit model
             else
               let currentState := config.getState model
               let candidates ← if key == .tab && currentState.completion.isNone then
