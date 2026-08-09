@@ -7,7 +7,7 @@ package «termcolor-repl» where
 
 require «termcolor-terminal» from git
   "https://github.com/jonaprieto/lean-termcolor-terminal.git"
-  @ "v0.3.0"
+  @ "v0.3.1"
 
 @[default_target]
 lean_lib «TermColor.Repl» where
