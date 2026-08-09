@@ -81,6 +81,28 @@ def ensureReading (reader : KeyReader) : IO Unit := do
 
 end KeyReader
 
+private structure EventReader where
+  result : IO.Ref (Option (Option Event))
+  active : IO.Ref Bool
+  signal : Std.Notify
+
+private def newEventReader : IO EventReader := do
+  pure {
+    result := ← IO.mkRef none
+    active := ← IO.mkRef false
+    signal := ← Std.Notify.new
+  }
+
+private def ensureEventReading (reader : EventReader) : IO Unit := do
+  unless ← reader.active.get do
+    reader.active.set true
+    let _task ← IO.asTask do
+      try
+        reader.result.set (some (← readEvent))
+      finally
+        reader.active.set false
+        reader.signal.notify
+
 /-- Configuration for cooperative background jobs.
 
 Multiple submitted lines may run at the same time. The renderer remains the
@@ -102,8 +124,13 @@ structure Config (Model : Type) where
   fallbackSize : Size := { columns := 80, rows := 24 }
   tickMs : UInt32 := 60
   resizeMs : UInt32 := 250
+  mouse : Bool := false
   view : Model → Size → Text
   complete : Model → TextInputState → IO (List Completion)
+  /-- Handle an application-specific key before the REPL edits its input. -/
+  handleKey : Model → Key → Option Model := fun _ _ => none
+  /-- Handle an application mouse event before the REPL ignores it. -/
+  handleMouse : Model → Size → MouseEvent → Option Model := fun _ _ _ => none
   getState : Model → State
   setState : Model → State → Model
   submit : Model → String → IO Model
@@ -114,7 +141,7 @@ structure Config (Model : Type) where
 def currentSize (fallback : Size) : IO Size := do
   pure ((← terminalSize).getD fallback)
 
-private def waitForEvent (tickMs : UInt32) (reader : KeyReader)
+private def waitForEvent (tickMs : UInt32) (signal : Std.Notify)
     (wakeSignal : Option Std.Notify) : IO Bool := do
   match wakeSignal with
   | none =>
@@ -124,7 +151,7 @@ private def waitForEvent (tickMs : UInt32) (reader : KeyReader)
       let timer ← (Std.Async.Selector.sleep
         (Std.Time.Millisecond.Offset.ofNat tickMs.toNat)).block
       (Std.Async.Selectable.one #[
-        .case reader.signal.selector (fun _ => pure false),
+        .case signal.selector (fun _ => pure false),
         .case wakeSignal.selector (fun _ => pure false),
         .case timer (fun _ => pure true)
       ]).block
@@ -144,7 +171,7 @@ private def readKeyWithResizeAtSize (tickMs : UInt32) (fallback : Size) (screen 
     if ← wake then
       woken := true
     else
-      if ← waitForEvent tickMs reader wakeSignal then
+      if ← waitForEvent tickMs reader.signal wakeSignal then
         let nextSize ← currentSize fallback
         if nextSize != size then
           screen ← render screen nextSize
@@ -164,6 +191,34 @@ def readKeyWithResize (tickMs : UInt32) (fallback : Size) (screen : Screen)
   readKeyWithResizeAtSize tickMs fallback screen (fun screen _ => render screen)
     wake reader wakeSignal
 
+private def readEventWithResizeAtSize (tickMs : UInt32) (fallback : Size) (screen : Screen)
+    (render : Screen → Size → IO Screen) (wake : IO Bool := pure false)
+    (reader : Option EventReader := none) (wakeSignal : Option Std.Notify := none) :
+    IO (Screen × Option Event × Bool) := do
+  let reader ← match reader with
+    | some reader => pure reader
+    | none => newEventReader
+  ensureEventReading reader
+  let mut screen := screen
+  let mut size ← currentSize fallback
+  let mut woken := false
+  while !woken && (← reader.result.get).isNone do
+    if ← wake then
+      woken := true
+    else
+      if ← waitForEvent tickMs reader.signal wakeSignal then
+        let nextSize ← currentSize fallback
+        if nextSize != size then
+          screen ← render screen nextSize
+          size := nextSize
+  if woken then
+    pure (screen, none, true)
+  else
+    let event := (← reader.result.get).getD none
+    reader.result.set none
+    reader.active.set false
+    pure (screen, event, false)
+
 private structure JobRuntime (Model : Type) where
   cancellation : Cancellation
   result : IO.Ref (Option (Except String Model))
@@ -179,13 +234,15 @@ private def render {Model : Type} (config : Config Model) (screen : Screen)
 def run {Model : Type} (config : Config Model) : IO Unit := do
   hideCursor
   try
-    withRawInput do
+    let loop : IO Unit := withRawInput do
       let mut model := config.initial
       let mut screen ← Screen.start
       let mut activeJobs : List (JobRuntime Model) := []
-      let reader ← KeyReader.new
+      let reader ← newEventReader
       let wakeSignal ← Std.Notify.new
       let mut dirty := true
+      let frameNanos := config.tickMs.toNat * 1_000_000
+      let mut nextRender : Nat := 0
       while config.isRunning model do
         let mut pendingJobs : List (JobRuntime Model) := []
         for runtime in activeJobs do
@@ -204,86 +261,110 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                   dirty := true
               | none => pure ()
         activeJobs := pendingJobs.reverse
-        if dirty then
+        let now ← IO.monoNanosNow
+        if dirty && now >= nextRender then
           screen ← render config screen model
           dirty := false
+          nextRender := now + frameNanos
         let wake : IO Bool := do
           for runtime in activeJobs do
             if (← runtime.result.get).isSome then
               return true
+          if dirty then
+            let now ← IO.monoNanosNow
+            if now >= nextRender then
+              return true
           pure false
-        let (nextScreen, key) ← readKeyWithResizeAtSize config.resizeMs config.fallbackSize screen
+        let (nextScreen, event, woken) ← readEventWithResizeAtSize config.tickMs config.fallbackSize screen
           (fun screen size => renderAtSize config screen model size) wake (some reader)
           (some wakeSignal)
         screen := nextScreen
-        match key with
+        match event with
         | none =>
-            if activeJobs.isEmpty then
+            if !woken && activeJobs.isEmpty then
               model := config.quit model
-        | some key =>
-            if key == .escape || key == .ctrl 'x' then
-              match config.jobs, activeJobs.isEmpty with
-              | some jobs, false =>
-                  for runtime in activeJobs do
-                    runtime.cancellation.cancel
-                  model := jobs.cancel model
-                  activeJobs := []
-                  dirty := true
-              | _, _ =>
-                  if key == .ctrl 'x' then
-                    model := config.quit model
-                  else
-                    let currentState := config.getState model
-                    let (state, action) := match config.multiline with
-                      | some multiline => TermColor.Repl.updateMultiline multiline (fun _ => [])
-                          currentState key
-                      | none => TermColor.Repl.update config.inputConfig (fun _ => [])
-                          currentState key
-                    model := config.setState model state
-                    dirty := true
-                    if action == .quit then
-                      model := config.quit model
-            else
-              let currentState := config.getState model
-              let candidates ← if key == .tab && currentState.completion.isNone then
-                  config.complete model currentState.input
-                else
-                  pure []
-              let (state, action) := match config.multiline with
-                | some multiline => TermColor.Repl.updateMultiline multiline
-                    (fun _ => candidates) currentState key
-                | none => TermColor.Repl.update config.inputConfig
-                    (fun _ => candidates) currentState key
-              model := config.setState model state
-              dirty := true
-              match action with
-              | .changed => pure ()
-              | .quit => model := config.quit model
-              | .submit line =>
-                  match config.jobs with
-                  | some jobs =>
-                      if jobs.shouldRun model line then
-                        let cancellation ← Cancellation.new
-                        let result ← IO.mkRef none
-                        let started := jobs.start model line
-                        let runtime : JobRuntime Model := { cancellation, result }
-                        let _task ← IO.asTask do
-                          try
-                            result.set (some (.ok
-                              (← jobs.run cancellation started line)))
-                          catch error =>
-                            result.set (some (.error error.toString))
-                          finally
-                            wakeSignal.notify
-                        model := started
-                        activeJobs := runtime :: activeJobs
-                        dirty := true
-                      else
-                        model ← config.submit model line
-                        dirty := true
-                  | none =>
-                      model ← config.submit model line
+        | some (.mouse mouse) =>
+            let size ← currentSize config.fallbackSize
+            match config.handleMouse model size mouse with
+            | some nextModel =>
+                model := nextModel
+                dirty := true
+            | none => pure ()
+        | some (.key key) =>
+            match config.handleKey model key with
+            | some nextModel =>
+                model := nextModel
+                dirty := true
+            | none =>
+                if key == .escape || key == .ctrl 'x' then
+                  match config.jobs, activeJobs.isEmpty with
+                  | some jobs, false =>
+                      for runtime in activeJobs do
+                        runtime.cancellation.cancel
+                      model := jobs.cancel model
+                      activeJobs := []
                       dirty := true
+                  | _, _ =>
+                      if key == .ctrl 'x' then
+                        model := config.quit model
+                      else
+                        let currentState := config.getState model
+                        let (state, action) := match config.multiline with
+                          | some multiline => TermColor.Repl.updateMultiline multiline (fun _ => [])
+                              currentState key
+                          | none => TermColor.Repl.update config.inputConfig (fun _ => [])
+                              currentState key
+                        model := config.setState model state
+                        dirty := true
+                        if action == .quit then
+                          model := config.quit model
+                else
+                  let currentState := config.getState model
+                  let candidates ← if key == .tab && currentState.completion.isNone then
+                      config.complete model currentState.input
+                    else
+                      pure []
+                  let (state, action) := match config.multiline with
+                    | some multiline => TermColor.Repl.updateMultiline multiline
+                        (fun _ => candidates) currentState key
+                    | none => TermColor.Repl.update config.inputConfig
+                        (fun _ => candidates) currentState key
+                  model := config.setState model state
+                  dirty := true
+                  match action with
+                  | .changed => pure ()
+                  | .quit => model := config.quit model
+                  | .submit line =>
+                      match config.jobs with
+                      | some jobs =>
+                          if jobs.shouldRun model line then
+                            let cancellation ← Cancellation.new
+                            let result ← IO.mkRef none
+                            let started := jobs.start model line
+                            let runtime : JobRuntime Model := { cancellation, result }
+                            let _task ← IO.asTask do
+                              try
+                                result.set (some (.ok
+                                  (← jobs.run cancellation started line)))
+                              catch error =>
+                                result.set (some (.error error.toString))
+                              finally
+                                wakeSignal.notify
+                            model := started
+                            activeJobs := runtime :: activeJobs
+                            dirty := true
+                          else
+                            model ← config.submit model line
+                            screen := Screen.empty
+                            dirty := true
+                      | none =>
+                          model ← config.submit model line
+                          screen := Screen.empty
+                          dirty := true
+    if config.mouse then
+      withMouseCapture loop
+    else
+      loop
   finally
     showCursor
     clearScreen

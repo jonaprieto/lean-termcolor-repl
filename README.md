@@ -22,7 +22,9 @@ pure actions. `FileCompletion` provides bounded completion for the token under t
 
 `TermColor.Repl.Terminal` adds terminal size lookup, resize-aware key input, multiline input,
 transient-command suspension, and cooperative jobs. Each submitted line may run independently;
-the renderer merges completed results while input and other jobs continue.
+the renderer merges completed results while input and other jobs continue. `Config.handleKey` and
+`Config.handleMouse` let an application consume its own input before normal REPL handling; set
+`Config.mouse` to enable SGR mouse capture.
 
 ```lean
 import TermColor.Repl
