@@ -85,23 +85,39 @@ private structure EventReader where
   result : IO.Ref (Option (Option Event))
   active : IO.Ref Bool
   signal : Std.Notify
+  task : IO.Ref (Option (Task (Except IO.Error Unit)))
 
 private def newEventReader : IO EventReader := do
   pure {
     result := ← IO.mkRef none
     active := ← IO.mkRef false
     signal := ← Std.Notify.new
+    task := ← IO.mkRef none
   }
 
-private def ensureEventReading (reader : EventReader) : IO Unit := do
-  unless ← reader.active.get do
+private def ensureEventReading (reader : EventReader) (keepGoing : IO Bool) : IO Unit := do
+  unless (← reader.active.get) || (← reader.result.get).isSome do
     reader.active.set true
-    let _task ← IO.asTask do
+    let task ← IO.asTask do
       try
-        reader.result.set (some (← readEvent))
+        reader.result.set (some (← readEventWhile keepGoing))
       finally
         reader.active.set false
         reader.signal.notify
+    reader.task.set (some task)
+
+private def takeEvent (reader : EventReader) : IO (Option (Option Event)) := do
+  let result ← reader.result.get
+  if result.isSome then
+    reader.result.set none
+  pure result
+
+private def waitEventReader (reader : EventReader) : IO Unit := do
+  while ← reader.active.get do
+    IO.sleep 1
+  match ← reader.task.get with
+  | some task => let _ := task.get
+  | none => pure ()
 
 /-- Configuration for cooperative background jobs.
 
@@ -211,12 +227,13 @@ def readKeyWithResize (tickMs : UInt32) (fallback : Size) (screen : Screen)
 
 private def readEventWithResizeAtSize (tickMs : UInt32) (fallback : Size) (screen : Screen)
     (render : Screen → Size → IO Screen) (wake : IO Bool := pure false)
-    (reader : Option EventReader := none) (wakeSignal : Option Std.Notify := none) :
+    (reader : Option EventReader := none) (wakeSignal : Option Std.Notify := none)
+    (keepGoing : IO Bool := pure true) :
     IO (Screen × Option Event × Bool) := do
   let reader ← match reader with
     | some reader => pure reader
     | none => newEventReader
-  ensureEventReading reader
+  ensureEventReading reader keepGoing
   let mut screen := screen
   let mut size ← currentSize fallback
   let mut woken := false
@@ -232,14 +249,13 @@ private def readEventWithResizeAtSize (tickMs : UInt32) (fallback : Size) (scree
   if woken then
     pure (screen, none, true)
   else
-    let event := (← reader.result.get).getD none
-    reader.result.set none
-    reader.active.set false
+    let event := (← takeEvent reader).getD none
     pure (screen, event, false)
 
 private structure JobRuntime (Model : Type) where
   cancellation : Cancellation
   result : IO.Ref (Option (Except String Model))
+  task : Task (Except IO.Error Unit)
 
 private def renderAtSize {Model : Type} (config : Config Model) (screen : Screen)
     (model : Model) (size : Size) : IO Screen :=
@@ -251,12 +267,14 @@ private def render {Model : Type} (config : Config Model) (screen : Screen)
 
 def run {Model : Type} (config : Config Model) : IO Unit := do
   hideCursor
+  let cancellation ← Cancellation.new
+  let reader ← newEventReader
+  let jobsRef ← IO.mkRef ([] : List (JobRuntime Model))
   try
     let loop : IO Unit := withRawInput do
       let mut model := config.initial
       let mut screen ← Screen.start
       let mut activeJobs : List (JobRuntime Model) := []
-      let reader ← newEventReader
       let wakeSignal ← Std.Notify.new
       let mut dirty := true
       let frameNanos := config.tickMs.toNat * 1_000_000
@@ -279,6 +297,7 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                   dirty := true
               | none => pure ()
         activeJobs := pendingJobs.reverse
+        jobsRef.set activeJobs
         if !activeJobs.isEmpty then
           match config.jobs with
           | some jobs =>
@@ -302,7 +321,7 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
         let (nextScreen, event, woken) ←
           readEventWithResizeAtSize config.tickMs config.fallbackSize screen
           (fun screen size => renderAtSize config screen model size) wake (some reader)
-          (some wakeSignal)
+          (some wakeSignal) (do return !(← cancellation.isCancelled))
         screen := nextScreen
         match event with
         | none =>
@@ -349,8 +368,11 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                       | some jobs, false =>
                           for runtime in activeJobs do
                             runtime.cancellation.cancel
+                          for runtime in activeJobs do
+                            let _ := runtime.task.get
                           model := jobs.cancel model
                           activeJobs := []
+                          jobsRef.set []
                           dirty := true
                       | _, _ =>
                           if editorAction == some .forceQuit then
@@ -395,8 +417,7 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                                 let cancellation ← Cancellation.new
                                 let result ← IO.mkRef none
                                 let started := jobs.start model line
-                                let runtime : JobRuntime Model := { cancellation, result }
-                                let _task ← IO.asTask do
+                                let task ← IO.asTask do
                                   try
                                     result.set (some (.ok
                                       (← jobs.run cancellation started line)))
@@ -404,8 +425,10 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                                     result.set (some (.error error.toString))
                                   finally
                                     wakeSignal.notify
+                                let runtime : JobRuntime Model := { cancellation, result, task }
                                 model := started
                                 activeJobs := runtime :: activeJobs
+                                jobsRef.set activeJobs
                                 dirty := true
                               else
                                 model ← config.submit model line
@@ -420,6 +443,12 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
     else
       loop
   finally
+    cancellation.cancel
+    waitEventReader reader
+    for runtime in ← jobsRef.get do
+      runtime.cancellation.cancel
+    for runtime in ← jobsRef.get do
+      let _ := runtime.task.get
     showCursor
     clearScreen
 
