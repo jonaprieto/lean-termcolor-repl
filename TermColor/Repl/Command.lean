@@ -68,21 +68,29 @@ private def children {α : Type} : Argus.Command α → List (Argus.Command α)
   | { body := .subs children, .. } => children
   | _ => []
 
-private def childByName {α : Type} (root : Argus.Command α) (name : String) :
-    Option (Argus.Command α) :=
-  (children root).find? (·.name == name)
-
-private def commandNames {α : Type} (root : Argus.Command α) : List String :=
-  (children root).map (fun command => "/" ++ command.name)
-
 private def candidate (input : TextInputState) (replacement : String) : Completion :=
   let (start, stop) := cursorRange input
   { replacement, range := some (start, stop) }
 
+private def commandPrefix (input : TextInputState) : String :=
+  let (start, _) := cursorRange input
+  String.ofList (input.value.toList.take start)
+
+private def commandForCompletion {α : Type} (root : Argus.Command α)
+    (input : TextInputState) : Argus.Command α :=
+  match words (commandPrefix input) with
+  | first :: rest =>
+      root.resolve ((first.value.drop 1).toString :: rest.map (·.value))
+  | [] => root
+
 private def commandCandidates {α : Type} (root : Argus.Command α) (input : TextInputState) :
     List Completion :=
   let fragment := cursorWord input
-  (commandNames root).filter (·.startsWith fragment) |>.map (candidate input)
+  let marker := if fragment.startsWith "/" then "/" else ""
+  let fragment := if marker.isEmpty then fragment else fragment.drop 1 |>.toString
+  (children (commandForCompletion root input)).map (fun command => command.name)
+    |>.filter (·.startsWith fragment)
+    |>.map (fun name => candidate input (marker ++ name))
 
 private def flagWords (flags : List Argus.FlagInfo) : List String :=
   flags.flatMap fun flag =>
@@ -154,7 +162,10 @@ private def optionCandidates {α : Type} (command : Argus.Command α) (input : T
 private def exactCommand {α : Type} (root : Argus.Command α) (input : TextInputState) :
     Option (Argus.Command α) :=
   match words (inputBeforeCursor input) with
-  | first :: _ => childByName root (first.value.drop 1).toString
+  | first :: rest =>
+      let argv := (first.value.drop 1).toString :: rest.map (·.value)
+      let (path, command) := root.resolvePath argv
+      if path.length > 1 then some command else none
   | [] => none
 
 /-- Parse a slash command using the supplied Argus command group. -/
@@ -189,7 +200,9 @@ def completeCommandWith {Action : Type} (root : CommandSpec Action)
   | none => pure (commandCandidates root input)
   | some command =>
       let fragment := cursorWord input
-      if fragment.startsWith "-" || (valueInfo command input).isNone then
+      if command.body matches .subs _ then
+        pure (commandCandidates root input)
+      else if fragment.startsWith "-" || (valueInfo command input).isNone then
         let options := optionCandidates command input
         if options.isEmpty then argumentCandidates command input values else pure options
       else

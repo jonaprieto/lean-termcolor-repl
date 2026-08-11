@@ -21,3 +21,8 @@ lean_lib «TermColor.Repl» where
 lean_lib «TermColor.Repl.Properties» where
   roots := #[`TermColor.Repl.Properties]
   globs := #[.andSubmodules `TermColor.Repl.Properties]
+
+@[test_driver]
+lean_exe tests where
+  root := `Tests
+  srcDir := "test"

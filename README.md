@@ -46,7 +46,7 @@ def handle (state : State) (key : Key) : State × Action :=
 ## Build
 
 ```sh
-lake build TermColor.Repl TermColor.Repl.Properties
+lake build TermColor.Repl TermColor.Repl.Properties tests
 ```
 
 ## Related projects
