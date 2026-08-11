@@ -323,9 +323,10 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                   | none => none
                   | some binding => some (keymap.handle model binding.action)
             match appKey with
-            | some nextModel =>
+            | some (some nextModel) =>
                 model := nextModel
                 dirty := true
+            | some none => pure ()
             | none =>
                 match config.handleKey model key with
                 | some nextModel =>
