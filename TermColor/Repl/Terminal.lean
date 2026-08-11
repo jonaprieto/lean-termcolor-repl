@@ -117,6 +117,14 @@ structure JobConfig (Model : Type) where
   cancel : Model → Model := id
   fail : Model → String → Model := fun model _ => model
 
+/-! ## Application keymaps -/
+
+structure AppKeymap (Model : Type) where
+  Action : Type
+  keymap : Keymap Action
+  contexts : Model → List String := fun _ => []
+  handle : Model → Action → Option Model
+
 structure Config (Model : Type) where
   initial : Model
   inputConfig : TextInputConfig
@@ -127,6 +135,8 @@ structure Config (Model : Type) where
   mouse : Bool := false
   view : Model → Size → Text
   complete : Model → TextInputState → IO (List Completion)
+  /-- Declarative application bindings. The first matching binding wins. -/
+  keymap : Option (AppKeymap Model) := none
   /-- Handle an application-specific key before the REPL edits its input. -/
   handleKey : Model → Key → Option Model := fun _ _ => none
   /-- Handle an application mouse event before the REPL ignores it. -/
@@ -291,76 +301,94 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                 dirty := true
             | none => pure ()
         | some (.key key) =>
-            match config.handleKey model key with
+            let appKey := match config.keymap with
+              | none => none
+              | some keymap =>
+                  match keymap.keymap.resolve (keymap.contexts model) key with
+                  | none => none
+                  | some action => keymap.handle model action
+            match appKey with
             | some nextModel =>
                 model := nextModel
                 dirty := true
             | none =>
-                if key == .escape || key == .ctrl 'x' then
-                  match config.jobs, activeJobs.isEmpty with
-                  | some jobs, false =>
-                      for runtime in activeJobs do
-                        runtime.cancellation.cancel
-                      model := jobs.cancel model
-                      activeJobs := []
-                      dirty := true
-                  | _, _ =>
-                      if key == .ctrl 'x' then
-                        model := config.quit model
-                      else
-                        let currentState := config.getState model
-                        let (state, action) := match config.multiline with
-                          | some multiline => TermColor.Repl.updateMultiline multiline (fun _ => [])
-                              currentState key
-                          | none => TermColor.Repl.update config.inputConfig (fun _ => [])
-                              currentState key
-                        model := config.setState model state
-                        dirty := true
-                        if action == .quit then
-                          model := config.quit model
-                else
-                  let currentState := config.getState model
-                  let candidates ← if key == .tab && currentState.completion.isNone then
-                      config.complete model currentState.input
-                    else
-                      pure []
-                  let (state, action) := match config.multiline with
-                    | some multiline => TermColor.Repl.updateMultiline multiline
-                        (fun _ => candidates) currentState key
-                    | none => TermColor.Repl.update config.inputConfig
-                        (fun _ => candidates) currentState key
-                  model := config.setState model state
-                  dirty := true
-                  match action with
-                  | .changed => pure ()
-                  | .quit => model := config.quit model
-                  | .submit line =>
-                      match config.jobs with
-                      | some jobs =>
-                          if jobs.shouldRun model line then
-                            let cancellation ← Cancellation.new
-                            let result ← IO.mkRef none
-                            let started := jobs.start model line
-                            let runtime : JobRuntime Model := { cancellation, result }
-                            let _task ← IO.asTask do
-                              try
-                                result.set (some (.ok
-                                  (← jobs.run cancellation started line)))
-                              catch error =>
-                                result.set (some (.error error.toString))
-                              finally
-                                wakeSignal.notify
-                            model := started
-                            activeJobs := runtime :: activeJobs
-                            dirty := true
-                          else
-                            model ← config.submit model line
-                            screen := Screen.empty
-                            dirty := true
+                match config.handleKey model key with
+                | some nextModel =>
+                    model := nextModel
+                    dirty := true
+                | none =>
+                    let currentState := config.getState model
+                    let editorAction := match config.multiline with
+                      | some multiline =>
+                          let keymap := multiline.keymap.getD (defaultEditorKeymap multiline.lineBreak)
+                          keymap.resolve (editorContexts
+                            { completionOpen := currentState.completion.isSome, multiline := true }) key
                       | none =>
-                          model ← config.submit model line
-                          screen := Screen.empty
+                          (defaultEditorKeymap).resolve (editorContexts
+                            { completionOpen := currentState.completion.isSome }) key
+                    if editorAction == some .quit || editorAction == some .forceQuit then
+                      match config.jobs, activeJobs.isEmpty with
+                      | some jobs, false =>
+                          for runtime in activeJobs do
+                            runtime.cancellation.cancel
+                          model := jobs.cancel model
+                          activeJobs := []
                           dirty := true
+                      | _, _ =>
+                          if editorAction == some .forceQuit then
+                            model := config.quit model
+                          else
+                            let (state, action) := match config.multiline with
+                              | some multiline => TermColor.Repl.updateMultiline multiline (fun _ => [])
+                                  currentState key
+                              | none => TermColor.Repl.update config.inputConfig (fun _ => [])
+                                  currentState key
+                            model := config.setState model state
+                            dirty := true
+                            if action == .quit then
+                              model := config.quit model
+                    else
+                      let candidates ← if editorAction == some .complete && currentState.completion.isNone then
+                          config.complete model currentState.input
+                        else
+                          pure []
+                      let (state, action) := match config.multiline with
+                        | some multiline => TermColor.Repl.updateMultiline multiline
+                            (fun _ => candidates) currentState key
+                        | none => TermColor.Repl.update config.inputConfig
+                            (fun _ => candidates) currentState key
+                      model := config.setState model state
+                      dirty := true
+                      match action with
+                      | .changed => pure ()
+                      | .quit => model := config.quit model
+                      | .submit line =>
+                          match config.jobs with
+                          | some jobs =>
+                              if jobs.shouldRun model line then
+                                let cancellation ← Cancellation.new
+                                let result ← IO.mkRef none
+                                let started := jobs.start model line
+                                let runtime : JobRuntime Model := { cancellation, result }
+                                let _task ← IO.asTask do
+                                  try
+                                    result.set (some (.ok
+                                      (← jobs.run cancellation started line)))
+                                  catch error =>
+                                    result.set (some (.error error.toString))
+                                  finally
+                                    wakeSignal.notify
+                                model := started
+                                activeJobs := runtime :: activeJobs
+                                dirty := true
+                              else
+                                model ← config.submit model line
+                                screen := Screen.empty
+                                dirty := true
+                          | none =>
+                              model ← config.submit model line
+                              screen := Screen.empty
+                              dirty := true
     if config.mouse then
       withMouseCapture loop
     else

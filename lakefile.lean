@@ -2,12 +2,16 @@ import Lake
 open Lake DSL
 
 package «termcolor-repl» where
-  version := v!"0.6.2"
+  version := v!"0.7.0"
   leanOptions := #[⟨`autoImplicit, false⟩, ⟨`relaxedAutoImplicit, false⟩]
 
 require «termcolor-terminal» from git
   "https://github.com/jonaprieto/lean-termcolor-terminal.git"
   @ "v0.3.1"
+
+require argus from git
+  "https://github.com/jonaprieto/lean-argus.git"
+  @ "v0.4.8"
 
 @[default_target]
 lean_lib «TermColor.Repl» where

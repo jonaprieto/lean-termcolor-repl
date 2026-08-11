@@ -5,6 +5,7 @@ Authors: Jonathan Prieto-Cubides
 -/
 
 import TermColor.Widgets
+import TermColor.Repl.Keymap
 
 /-!
 # TermColor.Repl
@@ -57,6 +58,7 @@ deriving Repr
 structure MultilineConfig where
   text : TextInputConfig := {}
   lineBreak : Key := .ctrl 'n'
+  keymap : Option (Keymap EditorAction) := none
 deriving Repr
 
 inductive Action where
@@ -105,16 +107,16 @@ private def hasNewline (state : TextInputState) : Bool :=
 
 private def updateMultilineInput (config : MultilineConfig) (key : Key)
     (state : TextInputState) : TextInputState :=
-  if key == config.lineBreak then
-    let cursor := min state.cursor state.value.toList.length
-    if state.value.toList.length < config.text.maxLength then
-      let chars := state.value.toList
-      { value := String.ofList (chars.take cursor ++ ['\n'] ++ chars.drop cursor)
-        cursor := cursor + 1 }
-    else
-      { state with cursor }
+  updateTextInput config.text key state
+
+private def insertLineBreak (config : MultilineConfig) (state : TextInputState) : TextInputState :=
+  let cursor := min state.cursor state.value.toList.length
+  if state.value.toList.length < config.text.maxLength then
+    let chars := state.value.toList
+    { value := String.ofList (chars.take cursor ++ ['\n'] ++ chars.drop cursor)
+      cursor := cursor + 1 }
   else
-    updateTextInput config.text key state
+    { state with cursor }
 
 private def commonPrefix : List Char → List Char → List Char
   | left :: rest, right :: tail =>
@@ -232,19 +234,29 @@ private def acceptCompletion (state : State) : State :=
   | none => state
   | some menu => selectCompletion state menu.selected
 
-private def updateCommon (complete : TextInputState → List Completion)
+private def updateCommon (keymap : Keymap EditorAction) (multiline : Bool)
+    (complete : TextInputState → List Completion)
     (up down : State → State)
     (inputUpdate : Key → TextInputState → TextInputState)
+    (lineBreak : TextInputState → TextInputState)
     (state : State) (key : Key) : State × Action :=
-  match key with
-  | .up =>
-      (if state.completion.isSome then cycleCompletion state false else up state, .changed)
-  | .down =>
-      (if state.completion.isSome then cycleCompletion state true else down state, .changed)
-  | .tab =>
-      (if state.completion.isSome then cycleCompletion state true
-       else completeWith state (complete state.input), .changed)
-  | .enter =>
+  let context := { completionOpen := state.completion.isSome, multiline }
+  match keymap.resolve (editorContexts context) key with
+  | some .completionPrevious =>
+      (cycleCompletion state false, .changed)
+  | some .completionNext =>
+      (cycleCompletion state true, .changed)
+  | some .complete =>
+      (completeWith state (complete state.input), .changed)
+  | some .dismissCompletion =>
+      ({ state with completion := none }, .changed)
+  | some .historyPrevious =>
+      (up state, .changed)
+  | some .historyNext =>
+      (down state, .changed)
+  | some .lineBreak =>
+      ({ state with input := lineBreak state.input }, .changed)
+  | some .submit =>
       let state := { acceptCompletion state with completion := none }
       let line := state.input.value.trimAscii.toString
       if line.isEmpty then
@@ -254,12 +266,11 @@ private def updateCommon (complete : TextInputState → List Completion)
           input := {}
           history := state.history.push line
           historyIndex := none }, .submit line)
-  | .escape =>
-      if state.completion.isSome then
-        ({ state with completion := none }, .changed)
-      else
-        (state, .quit)
-  | key =>
+  | some .quit =>
+      (state, .quit)
+  | some .forceQuit =>
+      (state, .quit)
+  | none =>
       ({ state with
         input := inputUpdate key state.input
         historyIndex := none
@@ -289,7 +300,7 @@ def recallDown (state : State) : State :=
 
 def updateMultiline (config : MultilineConfig) (complete : TextInputState → List Completion)
     (state : State) (key : Key) : State × Action :=
-  updateCommon complete
+  updateCommon (config.keymap.getD (defaultEditorKeymap config.lineBreak)) true complete
     (fun state =>
       if hasNewline state.input then
         { state with input := moveVertical true state.input }
@@ -298,11 +309,12 @@ def updateMultiline (config : MultilineConfig) (complete : TextInputState → Li
       if hasNewline state.input then
         { state with input := moveVertical false state.input }
       else recallDown state)
-    (fun key input => updateMultilineInput config key input) state key
+    (fun key input => updateMultilineInput config key input)
+    (insertLineBreak config) state key
 
 def update (config : TextInputConfig) (complete : TextInputState → List Completion)
     (state : State) (key : Key) : State × Action :=
-  updateCommon complete recallUp recallDown
-    (fun key input => updateTextInput config key input) state key
+  updateCommon (defaultEditorKeymap) false complete recallUp recallDown
+    (fun key input => updateTextInput config key input) id state key
 
 end TermColor.Repl

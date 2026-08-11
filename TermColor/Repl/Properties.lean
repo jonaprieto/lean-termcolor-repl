@@ -86,4 +86,18 @@ example :
       { input := { value := "a\nb", cursor := 3 }} .enter).2 = .submit "a\nb" := by
   native_decide
 
+example :
+    (defaultEditorKeymap.resolve ["editor"] .enter) = some .submit := by
+  native_decide
+
+example :
+    (defaultEditorKeymap.resolve ["editor", "completion"] .escape) =
+      some .dismissCompletion := by
+  native_decide
+
+example :
+    (defaultEditorKeymap.resolve ["multiline", "editor"] (.ctrl 'n')) =
+      some .lineBreak := by
+  native_decide
+
 end TermColor.Repl.Properties
