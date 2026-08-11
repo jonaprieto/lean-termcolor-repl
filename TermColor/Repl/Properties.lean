@@ -28,7 +28,7 @@ private def historyConfig : HistoryConfig := { path := "history", maxEntries := 
 private def multilineConfig : MultilineConfig := { text := config }
 
 private def customEditorKeymap : Keymap EditorAction :=
-  Keymap.fromSpecs [{ keys := [.ctrl 's'], action := .submit, context := some "editor" }]
+  Keymap.fromSpecs [{ keys := [.ctrl 's'], action := .submit, context := some KeyContext.editor }]
 
 example :
     (recallUp { history := #["first", "second"] }).input.value = "second" := by
@@ -101,25 +101,30 @@ example :
   native_decide
 
 example :
-    (defaultEditorKeymap.resolve ["editor"] .enter) = some .submit := by
+    (defaultEditorKeymap.resolve [KeyContext.editor] .enter) = some .submit := by
   native_decide
 
 example :
-    (defaultEditorKeymap.resolveBinding ["editor"] .enter).map (·.action) = some .submit := by
+    (defaultEditorKeymap.resolveBinding [KeyContext.editor] .enter).map (·.action) =
+      some .submit := by
   native_decide
 
 example :
-    (defaultEditorKeymap.resolve ["editor", "completion"] .escape) =
+    defaultEditorKeymap.conflicts = [] := by
+  native_decide
+
+example :
+    (defaultEditorKeymap.resolve [KeyContext.editor, KeyContext.completion] .escape) =
       some .dismissCompletion := by
   native_decide
 
 example :
-    (defaultEditorKeymap.resolve ["multiline", "editor"] (.ctrl 'n')) =
+    (defaultEditorKeymap.resolve [KeyContext.multiline, KeyContext.editor] (.ctrl 'n')) =
       some .lineBreak := by
   native_decide
 
 example :
-    (defaultEditorKeymap .enter).resolve ["multiline", "editor"] .enter =
+    (defaultEditorKeymap .enter).resolve [KeyContext.multiline, KeyContext.editor] .enter =
       some .lineBreak := by
   native_decide
 
@@ -129,7 +134,7 @@ example :
   native_decide
 
 example :
-    (customEditorKeymap.resolve ["editor"] (.ctrl 's')) = some .submit := by
+    (customEditorKeymap.resolve [KeyContext.editor] (.ctrl 's')) = some .submit := by
   native_decide
 
 example :

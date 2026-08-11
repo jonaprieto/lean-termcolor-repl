@@ -124,7 +124,7 @@ structure JobConfig (Model : Type) where
 structure AppKeymap (Model : Type) where
   Action : Type
   keymap : Keymap Action
-  contexts : Model → List String := fun _ => []
+  contexts : Model → List KeyContext := fun _ => []
   handle : Model → Action → Option Model
 
 def defaultFallbackSize : Size := { columns := 80, rows := 24 }
