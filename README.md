@@ -11,7 +11,7 @@ Lean 4 terminal REPLs.
 
 ```lean
 require termcolor-repl from git
-  "https://github.com/jonaprieto/lean-termcolor-repl.git" @ "v0.7.0"
+  "https://github.com/jonaprieto/lean-termcolor-repl.git" @ "v0.7.1"
 ```
 
 ## API

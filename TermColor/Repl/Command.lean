@@ -120,6 +120,14 @@ private def positionalInfo {α : Type} (command : Argus.Command α) (input : Tex
   let count := tokens.countP (fun token => !token.value.startsWith "-")
   listGet? metadata.args (min count (max 0 (metadata.args.length - 1)))
 
+private def valueCandidates (input : TextInputState) (values : List String) : List Completion :=
+  let fragment := cursorWord input
+  let hasSlash := fragment.startsWith "/"
+  let normalizedValue := if hasSlash then fragment.drop 1 |>.toString else fragment
+  let replacementPrefix := if hasSlash then "/" else ""
+  values.filter (·.startsWith normalizedValue) |>.map
+    (fun value => candidate input (replacementPrefix ++ value))
+
 private def argumentCandidates {α : Type} (command : Argus.Command α) (input : TextInputState)
     (values : String → IO (List String)) :
     IO (List Completion) := do
@@ -128,16 +136,14 @@ private def argumentCandidates {α : Type} (command : Argus.Command α) (input :
       if typeName == "PATH" then defaultFileCompletions input
       else
         let values ← values typeName
-        let fragment := cursorWord input
-        pure (values.filter (·.startsWith fragment) |>.map (candidate input))
+        pure (valueCandidates input values)
   | none =>
       match positionalInfo command input with
       | some info =>
           if info.typeName == "PATH" then defaultFileCompletions input
           else
             let values ← values info.typeName
-            let fragment := cursorWord input
-            pure (values.filter (·.startsWith fragment) |>.map (candidate input))
+            pure (valueCandidates input values)
       | none => pure []
 
 private def optionCandidates {α : Type} (command : Argus.Command α) (input : TextInputState) :
