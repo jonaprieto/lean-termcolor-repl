@@ -76,6 +76,11 @@ private def commandPrefix (input : TextInputState) : String :=
   let (start, _) := cursorRange input
   String.ofList (input.value.toList.take start)
 
+private def argvWords (source : String) : List String :=
+  match words source with
+  | first :: rest => (first.value.drop 1).toString :: rest.map (·.value)
+  | [] => []
+
 private def commandForCompletion {α : Type} (root : Argus.Command α)
     (input : TextInputState) : Argus.Command α :=
   match words (commandPrefix input) with
@@ -99,35 +104,6 @@ private def flagWords (flags : List Argus.FlagInfo) : List String :=
     | some short => long ++ ["-" ++ short.toString]
     | none => long
 
-private def flagTakesValue (flag : String) (info : Argus.FlagInfo) : Bool :=
-  flag == "--" ++ info.long ||
-    match info.short with
-    | some short => flag == "-" ++ short.toString
-    | none => false
-
-private def previousWord (input : TextInputState) : Option String :=
-  let cursor := min input.cursor input.value.toList.length
-  (words (String.ofList (input.value.toList.take cursor))).reverse.drop 1 |>.head?.map (·.value)
-
-private def listGet? {α : Type} : List α → Nat → Option α
-  | [], _ => none
-  | value :: _, 0 => some value
-  | _ :: rest, index + 1 => listGet? rest index
-
-private def valueInfo {α : Type} (command : Argus.Command α) (input : TextInputState) :
-    Option String :=
-  let metadata := command.toMeta
-  match previousWord input with
-  | some previous => metadata.flags.find? (flagTakesValue previous) |>.bind (·.typeName)
-  | none => none
-
-private def positionalInfo {α : Type} (command : Argus.Command α) (input : TextInputState) :
-    Option Argus.ArgInfo :=
-  let metadata := command.toMeta
-  let tokens := words (inputBeforeCursor input) |>.drop 1
-  let count := tokens.countP (fun token => !token.value.startsWith "-")
-  listGet? metadata.args (min count (max 0 (metadata.args.length - 1)))
-
 private def valueCandidates (input : TextInputState) (values : List String) : List Completion :=
   let fragment := cursorWord input
   let hasSlash := fragment.startsWith "/"
@@ -136,37 +112,18 @@ private def valueCandidates (input : TextInputState) (values : List String) : Li
   values.filter (·.startsWith normalizedValue) |>.map
     (fun value => candidate input (replacementPrefix ++ value))
 
-private def argumentCandidates {α : Type} (command : Argus.Command α) (input : TextInputState)
-    (values : String → IO (List String)) :
+private def argumentCandidates (input : TextInputState) (typeName : String)
+    (isPath : Bool) (values : String → IO (List String)) :
     IO (List Completion) := do
-  match valueInfo command input with
-  | some typeName =>
-      if typeName == "PATH" then defaultFileCompletions input
-      else
-        let values ← values typeName
-        pure (valueCandidates input values)
-  | none =>
-      match positionalInfo command input with
-      | some info =>
-          if info.typeName == "PATH" then defaultFileCompletions input
-          else
-            let values ← values info.typeName
-            pure (valueCandidates input values)
-      | none => pure []
+  if isPath then defaultFileCompletions input
+  else
+    let values ← values typeName
+    pure (valueCandidates input values)
 
 private def optionCandidates {α : Type} (command : Argus.Command α) (input : TextInputState) :
     List Completion :=
   let fragment := cursorWord input
   (flagWords command.toMeta.flags).filter (·.startsWith fragment) |>.map (candidate input)
-
-private def exactCommand {α : Type} (root : Argus.Command α) (input : TextInputState) :
-    Option (Argus.Command α) :=
-  match words (inputBeforeCursor input) with
-  | first :: rest =>
-      let argv := (first.value.drop 1).toString :: rest.map (·.value)
-      let (path, command) := root.resolvePath argv
-      if path.length > 1 then some command else none
-  | [] => none
 
 /-- Parse a slash command using the supplied Argus command group. -/
 def parseCommand {Action : Type} (root : CommandSpec Action) (source : String) :
@@ -196,17 +153,18 @@ def completeCommandWith {Action : Type} (root : CommandSpec Action)
   let tokens := words value
   if tokens.length ≤ 1 && !before.endsWith " " then
     return commandCandidates root input
-  match exactCommand root input with
-  | none => pure (commandCandidates root input)
-  | some command =>
-      let fragment := cursorWord input
-      if command.body matches .subs _ then
-        pure (commandCandidates root input)
-      else if fragment.startsWith "-" || (valueInfo command input).isNone then
-        let options := optionCandidates command input
-        if options.isEmpty then argumentCandidates command input values else pure options
-      else
-        argumentCandidates command input values
+  let before := argvWords (commandPrefix input)
+  let context := root.completionContext before (cursorWord input)
+  match context.target with
+  | .subcommand => pure (commandCandidates root input)
+  | .option => pure (optionCandidates context.command input)
+  | .flagValue info =>
+      match info.typeName with
+      | some typeName => argumentCandidates input typeName (info.completion == .path) values
+      | none => pure []
+  | .argument info =>
+      argumentCandidates input info.typeName (info.completion == .path) values
+  | .none => pure []
 
 /- Complete a slash command, using command metadata for names, options, and paths. -/
 def completeCommand {Action : Type} (root : CommandSpec Action) (input : TextInputState) :
