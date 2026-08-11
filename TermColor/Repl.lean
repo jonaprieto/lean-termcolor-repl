@@ -224,8 +224,13 @@ private def completeWith (state : State) (candidates : List Completion) : State 
       input := completeInput state.input candidates
       historyIndex := none
       completion := none }
-  | _ => { state with
-      input := completeInput state.input candidates
+  | _ =>
+      let input := completeInput state.input candidates
+      let delta := input.value.toList.length - state.input.value.toList.length
+      let candidates := candidates.map fun candidate =>
+        { candidate with range := candidate.range.map fun (start, stop) => (start, stop + delta) }
+      { state with
+      input := input
       historyIndex := none
       completion := some { candidates := candidates.toArray } }
 

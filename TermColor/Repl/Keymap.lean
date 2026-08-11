@@ -123,7 +123,9 @@ private def binding (keys : List Key) (action : EditorAction) (context : Option 
 
 def defaultEditorKeymap (lineBreak : Key := .ctrl 'n') : Keymap EditorAction :=
   Keymap.fromSpecs
-    [ binding [.up] .completionPrevious (some "completion") (Keymap.keyLabel .up) "previous completion"
+    [ binding [lineBreak] .lineBreak (some "multiline") (Keymap.keyLabel lineBreak)
+        "insert a line break"
+    , binding [.up] .completionPrevious (some "completion") (Keymap.keyLabel .up) "previous completion"
     , binding [.down] .completionNext (some "completion") (Keymap.keyLabel .down) "next completion"
     , binding [.tab] .completionNext (some "completion") (Keymap.keyLabel .tab) "next completion"
     , binding [.tab] .complete (some "editor") (Keymap.keyLabel .tab) "complete input"
@@ -133,7 +135,6 @@ def defaultEditorKeymap (lineBreak : Key := .ctrl 'n') : Keymap EditorAction :=
     , binding [.escape] .dismissCompletion (some "completion") (Keymap.keyLabel .escape) "close completion menu"
     , binding [.escape] .quit (some "editor") (Keymap.keyLabel .escape) "quit"
     , binding [.ctrl 'x'] .forceQuit (some "editor") (Keymap.keyLabel (.ctrl 'x')) "quit"
-    , binding [lineBreak] .lineBreak (some "multiline") (Keymap.keyLabel lineBreak) "insert a line break"
     ]
 
 end TermColor.Repl

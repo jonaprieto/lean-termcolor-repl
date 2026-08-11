@@ -18,6 +18,11 @@ private def commandCompletion : TextInputState → List Completion
       ["/help", "/history"].filter (·.startsWith input.value) |>.map
         (fun replacement => { replacement })
 
+private def overlappingCompletion : TextInputState → List Completion
+  | input =>
+      ["/to-lean", "/to-tptp"].filter (·.startsWith input.value) |>.map
+        (fun replacement => { replacement, range := some (0, input.value.length) })
+
 private def historyConfig : HistoryConfig := { path := "history", maxEntries := 2 }
 
 private def multilineConfig : MultilineConfig := { text := config }
@@ -65,6 +70,12 @@ example :
   native_decide
 
 example :
+    let state := (update config overlappingCompletion
+      { input := { value := "/to", cursor := 3 }} .tab).1
+    (update config overlappingCompletion state .enter).2 = .submit "/to-lean" := by
+  native_decide
+
+example :
     normalizeHistory historyConfig [" first ", "", "second", "first", "third"] =
       #["first", "third"] := by
   native_decide
@@ -101,6 +112,16 @@ example :
 example :
     (defaultEditorKeymap.resolve ["multiline", "editor"] (.ctrl 'n')) =
       some .lineBreak := by
+  native_decide
+
+example :
+    (defaultEditorKeymap .enter).resolve ["multiline", "editor"] .enter =
+      some .lineBreak := by
+  native_decide
+
+example :
+    (updateMultiline { multilineConfig with lineBreak := .enter } (fun _ => [])
+      { input := { value := "p", cursor := 1 }} .enter).1.input.value = "p\n" := by
   native_decide
 
 example :

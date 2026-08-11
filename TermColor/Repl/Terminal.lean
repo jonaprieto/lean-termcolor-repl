@@ -137,6 +137,8 @@ structure Config (Model : Type) where
   multiline : Option MultilineConfig := none
   fallbackSize : Size := defaultFallbackSize
   tickMs : UInt32 := defaultTickMs
+  /-- Deprecated compatibility field; resize checks now follow `tickMs`. -/
+  resizeMs : UInt32 := defaultTickMs
   editorKeymap : Option (Keymap EditorAction) := none
   mouse : Bool := false
   view : Model → Size → Text
@@ -279,7 +281,9 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
         activeJobs := pendingJobs.reverse
         if !activeJobs.isEmpty then
           match config.jobs with
-          | some jobs => model ← jobs.tick model
+          | some jobs =>
+              model ← jobs.tick model
+              dirty := true
           | none => pure ()
         let now ← IO.monoNanosNow
         if dirty && now >= nextRender then

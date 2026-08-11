@@ -11,7 +11,7 @@ Lean 4 terminal REPLs.
 
 ```lean
 require termcolor-repl from git
-  "https://github.com/jonaprieto/lean-termcolor-repl.git" @ "v0.7.1"
+  "https://github.com/jonaprieto/lean-termcolor-repl.git" @ "v0.7.2"
 ```
 
 ## API
@@ -21,6 +21,8 @@ pure actions. `Keymap.BindingSpec` and `Keymap.fromSpecs` keep editor/applicatio
 inspectable, and `Config.editorKeymap` applies a custom editor map to single- and multiline input.
 `FileCompletion` provides bounded completion for the token under the cursor, and `History` provides
 opt-in file persistence through `Except` results.
+
+`Config.resizeMs` remains as a compatibility field; resize checks are event-driven and use `tickMs`.
 
 `TermColor.Repl.Terminal` adds terminal size lookup, resize-aware key input, multiline input,
 transient-command suspension, and cooperative jobs. Each submitted line may run independently;
