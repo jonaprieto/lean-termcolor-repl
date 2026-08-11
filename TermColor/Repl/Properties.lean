@@ -18,9 +18,17 @@ private def commandCompletion : TextInputState → List Completion
       ["/help", "/history"].filter (·.startsWith input.value) |>.map
         (fun replacement => { replacement })
 
+private def overlappingCompletion : TextInputState → List Completion
+  | input =>
+      ["/to-lean", "/to-tptp"].filter (·.startsWith input.value) |>.map
+        (fun replacement => { replacement, range := some (0, input.value.length) })
+
 private def historyConfig : HistoryConfig := { path := "history", maxEntries := 2 }
 
 private def multilineConfig : MultilineConfig := { text := config }
+
+private def customEditorKeymap : Keymap EditorAction :=
+  Keymap.fromSpecs [{ keys := [.ctrl 's'], action := .submit, context := some KeyContext.editor }]
 
 example :
     (recallUp { history := #["first", "second"] }).input.value = "second" := by
@@ -62,6 +70,12 @@ example :
   native_decide
 
 example :
+    let state := (update config overlappingCompletion
+      { input := { value := "/to", cursor := 3 }} .tab).1
+    (update config overlappingCompletion state .enter).2 = .submit "/to-lean" := by
+  native_decide
+
+example :
     normalizeHistory historyConfig [" first ", "", "second", "first", "third"] =
       #["first", "third"] := by
   native_decide
@@ -84,6 +98,58 @@ example :
 example :
     (updateMultiline multilineConfig (fun _ => [])
       { input := { value := "a\nb", cursor := 3 }} .enter).2 = .submit "a\nb" := by
+  native_decide
+
+example :
+    (defaultEditorKeymap.resolve [KeyContext.editor] .enter) = some .submit := by
+  native_decide
+
+example :
+    (defaultEditorKeymap.resolveBinding [KeyContext.editor] .enter).map (·.action) =
+      some .submit := by
+  native_decide
+
+example :
+    defaultEditorKeymap.conflicts = [] := by
+  native_decide
+
+example :
+    (defaultEditorKeymap.resolve [KeyContext.editor, KeyContext.completion] .escape) =
+      some .dismissCompletion := by
+  native_decide
+
+example :
+    (defaultEditorKeymap.resolve [KeyContext.multiline, KeyContext.editor] (.ctrl 'n')) =
+      some .lineBreak := by
+  native_decide
+
+example :
+    (defaultEditorKeymap .enter).resolve [KeyContext.multiline, KeyContext.editor] .enter =
+      some .lineBreak := by
+  native_decide
+
+example :
+    (updateMultiline { multilineConfig with lineBreak := .enter } (fun _ => [])
+      { input := { value := "p", cursor := 1 }} .enter).1.input.value = "p\n" := by
+  native_decide
+
+example :
+    (customEditorKeymap.resolve [KeyContext.editor] (.ctrl 's')) = some .submit := by
+  native_decide
+
+example :
+    (updateWithKeymap config customEditorKeymap (fun _ => [])
+      { input := { value := "p => p", cursor := 6 }} (.ctrl 's')).2 =
+      .submit "p => p" := by
+  native_decide
+
+example :
+    (updateMultilineWithKeymap multilineConfig customEditorKeymap (fun _ => [])
+      { input := { value := "p => p", cursor := 6 }} (.ctrl 's')).2 =
+      .submit "p => p" := by
+  native_decide
+
+example : Keymap.keyLabel (.ctrl 's') = "Ctrl-s" := by
   native_decide
 
 end TermColor.Repl.Properties

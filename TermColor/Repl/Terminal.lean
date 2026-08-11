@@ -113,20 +113,38 @@ structure JobConfig (Model : Type) where
   shouldRun : Model → String → Bool := fun _ _ => true
   start : Model → String → Model
   run : Cancellation → Model → String → IO Model
+  /-- Poll shared background state and advance live job presentation. -/
+  tick : Model → IO Model := pure
   finish : Model → Model → Model := fun _ completed => completed
   cancel : Model → Model := id
   fail : Model → String → Model := fun model _ => model
+
+/-! ## Application keymaps -/
+
+structure AppKeymap (Model : Type) where
+  Action : Type
+  keymap : Keymap Action
+  contexts : Model → List KeyContext := fun _ => []
+  handle : Model → Action → Option Model
+
+def defaultFallbackSize : Size := { columns := 80, rows := 24 }
+
+def defaultTickMs : UInt32 := 60
 
 structure Config (Model : Type) where
   initial : Model
   inputConfig : TextInputConfig
   multiline : Option MultilineConfig := none
-  fallbackSize : Size := { columns := 80, rows := 24 }
-  tickMs : UInt32 := 60
-  resizeMs : UInt32 := 250
+  fallbackSize : Size := defaultFallbackSize
+  tickMs : UInt32 := defaultTickMs
+  /-- Deprecated compatibility field; resize checks now follow `tickMs`. -/
+  resizeMs : UInt32 := defaultTickMs
+  editorKeymap : Option (Keymap EditorAction) := none
   mouse : Bool := false
   view : Model → Size → Text
   complete : Model → TextInputState → IO (List Completion)
+  /-- Declarative application bindings. The first matching binding wins. -/
+  keymap : Option (AppKeymap Model) := none
   /-- Handle an application-specific key before the REPL edits its input. -/
   handleKey : Model → Key → Option Model := fun _ _ => none
   /-- Handle an application mouse event before the REPL ignores it. -/
@@ -261,6 +279,12 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                   dirty := true
               | none => pure ()
         activeJobs := pendingJobs.reverse
+        if !activeJobs.isEmpty then
+          match config.jobs with
+          | some jobs =>
+              model ← jobs.tick model
+              dirty := true
+          | none => pure ()
         let now ← IO.monoNanosNow
         if dirty && now >= nextRender then
           screen ← render config screen model
@@ -275,7 +299,8 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
             if now >= nextRender then
               return true
           pure false
-        let (nextScreen, event, woken) ← readEventWithResizeAtSize config.tickMs config.fallbackSize screen
+        let (nextScreen, event, woken) ←
+          readEventWithResizeAtSize config.tickMs config.fallbackSize screen
           (fun screen size => renderAtSize config screen model size) wake (some reader)
           (some wakeSignal)
         screen := nextScreen
@@ -291,76 +316,105 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                 dirty := true
             | none => pure ()
         | some (.key key) =>
-            match config.handleKey model key with
-            | some nextModel =>
+            let appKey : Option (Option Model) := match config.keymap with
+              | none => none
+              | some keymap =>
+                  match keymap.keymap.resolveBinding (keymap.contexts model) key with
+                  | none => none
+                  | some binding => some (keymap.handle model binding.action)
+            match appKey with
+            | some (some nextModel) =>
                 model := nextModel
                 dirty := true
+            | some none => pure ()
             | none =>
-                if key == .escape || key == .ctrl 'x' then
-                  match config.jobs, activeJobs.isEmpty with
-                  | some jobs, false =>
-                      for runtime in activeJobs do
-                        runtime.cancellation.cancel
-                      model := jobs.cancel model
-                      activeJobs := []
-                      dirty := true
-                  | _, _ =>
-                      if key == .ctrl 'x' then
-                        model := config.quit model
-                      else
-                        let currentState := config.getState model
-                        let (state, action) := match config.multiline with
-                          | some multiline => TermColor.Repl.updateMultiline multiline (fun _ => [])
-                              currentState key
-                          | none => TermColor.Repl.update config.inputConfig (fun _ => [])
-                              currentState key
-                        model := config.setState model state
-                        dirty := true
-                        if action == .quit then
-                          model := config.quit model
-                else
-                  let currentState := config.getState model
-                  let candidates ← if key == .tab && currentState.completion.isNone then
-                      config.complete model currentState.input
-                    else
-                      pure []
-                  let (state, action) := match config.multiline with
-                    | some multiline => TermColor.Repl.updateMultiline multiline
-                        (fun _ => candidates) currentState key
-                    | none => TermColor.Repl.update config.inputConfig
-                        (fun _ => candidates) currentState key
-                  model := config.setState model state
-                  dirty := true
-                  match action with
-                  | .changed => pure ()
-                  | .quit => model := config.quit model
-                  | .submit line =>
-                      match config.jobs with
-                      | some jobs =>
-                          if jobs.shouldRun model line then
-                            let cancellation ← Cancellation.new
-                            let result ← IO.mkRef none
-                            let started := jobs.start model line
-                            let runtime : JobRuntime Model := { cancellation, result }
-                            let _task ← IO.asTask do
-                              try
-                                result.set (some (.ok
-                                  (← jobs.run cancellation started line)))
-                              catch error =>
-                                result.set (some (.error error.toString))
-                              finally
-                                wakeSignal.notify
-                            model := started
-                            activeJobs := runtime :: activeJobs
-                            dirty := true
-                          else
-                            model ← config.submit model line
-                            screen := Screen.empty
-                            dirty := true
+                match config.handleKey model key with
+                | some nextModel =>
+                    model := nextModel
+                    dirty := true
+                | none =>
+                    let currentState := config.getState model
+                      let editorAction := match config.multiline with
+                      | some multiline =>
+                          let keymap := multiline.keymap.getD
+                            (config.editorKeymap.getD (defaultEditorKeymap multiline.lineBreak))
+                          let context :=
+                            { completionOpen := currentState.completion.isSome, multiline := true }
+                          keymap.resolve (editorContexts context) key
                       | none =>
-                          model ← config.submit model line
-                          screen := Screen.empty
+                          (config.editorKeymap.getD defaultEditorKeymap).resolve (editorContexts
+                            { completionOpen := currentState.completion.isSome }) key
+                    if editorAction == some .quit || editorAction == some .forceQuit then
+                      match config.jobs, activeJobs.isEmpty with
+                      | some jobs, false =>
+                          for runtime in activeJobs do
+                            runtime.cancellation.cancel
+                          model := jobs.cancel model
+                          activeJobs := []
                           dirty := true
+                      | _, _ =>
+                          if editorAction == some .forceQuit then
+                            model := config.quit model
+                          else
+                            let (state, action) := match config.multiline with
+                              | some multiline =>
+                                  TermColor.Repl.updateMultilineWithKeymap multiline
+                                  (multiline.keymap.getD
+                                    (config.editorKeymap.getD
+                                      (defaultEditorKeymap multiline.lineBreak)))
+                                  (fun _ => []) currentState key
+                              | none => TermColor.Repl.updateWithKeymap config.inputConfig
+                                  (config.editorKeymap.getD defaultEditorKeymap)
+                                  (fun _ => []) currentState key
+                            model := config.setState model state
+                            dirty := true
+                            if action == .quit then
+                              model := config.quit model
+                    else
+                      let candidates ←
+                        if editorAction == some .complete && currentState.completion.isNone then
+                          config.complete model currentState.input
+                        else pure []
+                      let (state, action) := match config.multiline with
+                        | some multiline => TermColor.Repl.updateMultilineWithKeymap multiline
+                            (multiline.keymap.getD
+                              (config.editorKeymap.getD (defaultEditorKeymap multiline.lineBreak)))
+                            (fun _ => candidates) currentState key
+                        | none => TermColor.Repl.updateWithKeymap config.inputConfig
+                            (config.editorKeymap.getD defaultEditorKeymap)
+                            (fun _ => candidates) currentState key
+                      model := config.setState model state
+                      dirty := true
+                      match action with
+                      | .changed => pure ()
+                      | .quit => model := config.quit model
+                      | .submit line =>
+                          match config.jobs with
+                          | some jobs =>
+                              if jobs.shouldRun model line then
+                                let cancellation ← Cancellation.new
+                                let result ← IO.mkRef none
+                                let started := jobs.start model line
+                                let runtime : JobRuntime Model := { cancellation, result }
+                                let _task ← IO.asTask do
+                                  try
+                                    result.set (some (.ok
+                                      (← jobs.run cancellation started line)))
+                                  catch error =>
+                                    result.set (some (.error error.toString))
+                                  finally
+                                    wakeSignal.notify
+                                model := started
+                                activeJobs := runtime :: activeJobs
+                                dirty := true
+                              else
+                                model ← config.submit model line
+                                screen := Screen.empty
+                                dirty := true
+                          | none =>
+                              model ← config.submit model line
+                              screen := Screen.empty
+                              dirty := true
     if config.mouse then
       withMouseCapture loop
     else
