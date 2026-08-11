@@ -127,13 +127,17 @@ structure AppKeymap (Model : Type) where
   contexts : Model → List String := fun _ => []
   handle : Model → Action → Option Model
 
+def defaultFallbackSize : Size := { columns := 80, rows := 24 }
+
+def defaultTickMs : UInt32 := 60
+
 structure Config (Model : Type) where
   initial : Model
   inputConfig : TextInputConfig
   multiline : Option MultilineConfig := none
-  fallbackSize : Size := { columns := 80, rows := 24 }
-  tickMs : UInt32 := 60
-  resizeMs : UInt32 := 250
+  fallbackSize : Size := defaultFallbackSize
+  tickMs : UInt32 := defaultTickMs
+  editorKeymap : Option (Keymap EditorAction) := none
   mouse : Bool := false
   view : Model → Size → Text
   complete : Model → TextInputState → IO (List Completion)
@@ -324,13 +328,14 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                     dirty := true
                 | none =>
                     let currentState := config.getState model
-                    let editorAction := match config.multiline with
+                      let editorAction := match config.multiline with
                       | some multiline =>
-                          let keymap := multiline.keymap.getD (defaultEditorKeymap multiline.lineBreak)
+                          let keymap := multiline.keymap.getD
+                            (config.editorKeymap.getD (defaultEditorKeymap multiline.lineBreak))
                           keymap.resolve (editorContexts
                             { completionOpen := currentState.completion.isSome, multiline := true }) key
                       | none =>
-                          (defaultEditorKeymap).resolve (editorContexts
+                          (config.editorKeymap.getD defaultEditorKeymap).resolve (editorContexts
                             { completionOpen := currentState.completion.isSome }) key
                     if editorAction == some .quit || editorAction == some .forceQuit then
                       match config.jobs, activeJobs.isEmpty with
@@ -345,10 +350,12 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                             model := config.quit model
                           else
                             let (state, action) := match config.multiline with
-                              | some multiline => TermColor.Repl.updateMultiline multiline (fun _ => [])
-                                  currentState key
-                              | none => TermColor.Repl.update config.inputConfig (fun _ => [])
-                                  currentState key
+                              | some multiline => TermColor.Repl.updateMultilineWithKeymap multiline
+                                  (multiline.keymap.getD
+                                    (config.editorKeymap.getD (defaultEditorKeymap multiline.lineBreak)))
+                                  (fun _ => []) currentState key
+                              | none => TermColor.Repl.updateWithKeymap config.inputConfig
+                                  (config.editorKeymap.getD defaultEditorKeymap) (fun _ => []) currentState key
                             model := config.setState model state
                             dirty := true
                             if action == .quit then
@@ -359,10 +366,12 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                         else
                           pure []
                       let (state, action) := match config.multiline with
-                        | some multiline => TermColor.Repl.updateMultiline multiline
+                        | some multiline => TermColor.Repl.updateMultilineWithKeymap multiline
+                            (multiline.keymap.getD
+                              (config.editorKeymap.getD (defaultEditorKeymap multiline.lineBreak)))
                             (fun _ => candidates) currentState key
-                        | none => TermColor.Repl.update config.inputConfig
-                            (fun _ => candidates) currentState key
+                        | none => TermColor.Repl.updateWithKeymap config.inputConfig
+                            (config.editorKeymap.getD defaultEditorKeymap) (fun _ => candidates) currentState key
                       model := config.setState model state
                       dirty := true
                       match action with

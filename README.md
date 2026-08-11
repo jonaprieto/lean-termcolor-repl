@@ -11,14 +11,16 @@ Lean 4 terminal REPLs.
 
 ```lean
 require termcolor-repl from git
-  "https://github.com/jonaprieto/lean-termcolor-repl.git" @ "v0.5.0"
+  "https://github.com/jonaprieto/lean-termcolor-repl.git" @ "v0.7.0"
 ```
 
 ## API
 
 `TermColor.Repl.State` stores editable input and submitted history. `update` maps widget keys to
-pure actions. `FileCompletion` provides bounded completion for the token under the cursor, and
-`History` provides opt-in file persistence through `Except` results.
+pure actions. `Keymap.BindingSpec` and `Keymap.fromSpecs` keep editor/application bindings
+inspectable, and `Config.editorKeymap` applies a custom editor map to single- and multiline input.
+`FileCompletion` provides bounded completion for the token under the cursor, and `History` provides
+opt-in file persistence through `Except` results.
 
 `TermColor.Repl.Terminal` adds terminal size lookup, resize-aware key input, multiline input,
 transient-command suspension, and cooperative jobs. Each submitted line may run independently;

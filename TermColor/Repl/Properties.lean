@@ -22,6 +22,9 @@ private def historyConfig : HistoryConfig := { path := "history", maxEntries := 
 
 private def multilineConfig : MultilineConfig := { text := config }
 
+private def customEditorKeymap : Keymap EditorAction :=
+  Keymap.fromSpecs [{ keys := [.ctrl 's'], action := .submit, context := some "editor" }]
+
 example :
     (recallUp { history := #["first", "second"] }).input.value = "second" := by
   native_decide
@@ -98,6 +101,25 @@ example :
 example :
     (defaultEditorKeymap.resolve ["multiline", "editor"] (.ctrl 'n')) =
       some .lineBreak := by
+  native_decide
+
+example :
+    (customEditorKeymap.resolve ["editor"] (.ctrl 's')) = some .submit := by
+  native_decide
+
+example :
+    (updateWithKeymap config customEditorKeymap (fun _ => [])
+      { input := { value := "p => p", cursor := 6 }} (.ctrl 's')).2 =
+      .submit "p => p" := by
+  native_decide
+
+example :
+    (updateMultilineWithKeymap multilineConfig customEditorKeymap (fun _ => [])
+      { input := { value := "p => p", cursor := 6 }} (.ctrl 's')).2 =
+      .submit "p => p" := by
+  native_decide
+
+example : Keymap.keyLabel (.ctrl 's') = "Ctrl-s" := by
   native_decide
 
 end TermColor.Repl.Properties
