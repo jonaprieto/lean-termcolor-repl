@@ -113,6 +113,8 @@ structure JobConfig (Model : Type) where
   shouldRun : Model → String → Bool := fun _ _ => true
   start : Model → String → Model
   run : Cancellation → Model → String → IO Model
+  /-- Poll shared background state and advance live job presentation. -/
+  tick : Model → IO Model := pure
   finish : Model → Model → Model := fun _ completed => completed
   cancel : Model → Model := id
   fail : Model → String → Model := fun model _ => model
@@ -271,6 +273,10 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                   dirty := true
               | none => pure ()
         activeJobs := pendingJobs.reverse
+        if !activeJobs.isEmpty then
+          match config.jobs with
+          | some jobs => model ← jobs.tick model
+          | none => pure ()
         let now ← IO.monoNanosNow
         if dirty && now >= nextRender then
           screen ← render config screen model
