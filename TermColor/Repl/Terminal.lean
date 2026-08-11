@@ -299,7 +299,8 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
             if now >= nextRender then
               return true
           pure false
-        let (nextScreen, event, woken) ← readEventWithResizeAtSize config.tickMs config.fallbackSize screen
+        let (nextScreen, event, woken) ←
+          readEventWithResizeAtSize config.tickMs config.fallbackSize screen
           (fun screen size => renderAtSize config screen model size) wake (some reader)
           (some wakeSignal)
         screen := nextScreen
@@ -315,12 +316,12 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                 dirty := true
             | none => pure ()
         | some (.key key) =>
-            let appKey := match config.keymap with
+            let appKey : Option (Option Model) := match config.keymap with
               | none => none
               | some keymap =>
-                  match keymap.keymap.resolve (keymap.contexts model) key with
+                  match keymap.keymap.resolveBinding (keymap.contexts model) key with
                   | none => none
-                  | some action => keymap.handle model action
+                  | some binding => some (keymap.handle model binding.action)
             match appKey with
             | some nextModel =>
                 model := nextModel
@@ -336,8 +337,9 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                       | some multiline =>
                           let keymap := multiline.keymap.getD
                             (config.editorKeymap.getD (defaultEditorKeymap multiline.lineBreak))
-                          keymap.resolve (editorContexts
-                            { completionOpen := currentState.completion.isSome, multiline := true }) key
+                          let context :=
+                            { completionOpen := currentState.completion.isSome, multiline := true }
+                          keymap.resolve (editorContexts context) key
                       | none =>
                           (config.editorKeymap.getD defaultEditorKeymap).resolve (editorContexts
                             { completionOpen := currentState.completion.isSome }) key
@@ -354,28 +356,32 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
                             model := config.quit model
                           else
                             let (state, action) := match config.multiline with
-                              | some multiline => TermColor.Repl.updateMultilineWithKeymap multiline
+                              | some multiline =>
+                                  TermColor.Repl.updateMultilineWithKeymap multiline
                                   (multiline.keymap.getD
-                                    (config.editorKeymap.getD (defaultEditorKeymap multiline.lineBreak)))
+                                    (config.editorKeymap.getD
+                                      (defaultEditorKeymap multiline.lineBreak)))
                                   (fun _ => []) currentState key
                               | none => TermColor.Repl.updateWithKeymap config.inputConfig
-                                  (config.editorKeymap.getD defaultEditorKeymap) (fun _ => []) currentState key
+                                  (config.editorKeymap.getD defaultEditorKeymap)
+                                  (fun _ => []) currentState key
                             model := config.setState model state
                             dirty := true
                             if action == .quit then
                               model := config.quit model
                     else
-                      let candidates ← if editorAction == some .complete && currentState.completion.isNone then
+                      let candidates ←
+                        if editorAction == some .complete && currentState.completion.isNone then
                           config.complete model currentState.input
-                        else
-                          pure []
+                        else pure []
                       let (state, action) := match config.multiline with
                         | some multiline => TermColor.Repl.updateMultilineWithKeymap multiline
                             (multiline.keymap.getD
                               (config.editorKeymap.getD (defaultEditorKeymap multiline.lineBreak)))
                             (fun _ => candidates) currentState key
                         | none => TermColor.Repl.updateWithKeymap config.inputConfig
-                            (config.editorKeymap.getD defaultEditorKeymap) (fun _ => candidates) currentState key
+                            (config.editorKeymap.getD defaultEditorKeymap)
+                            (fun _ => candidates) currentState key
                       model := config.setState model state
                       dirty := true
                       match action with

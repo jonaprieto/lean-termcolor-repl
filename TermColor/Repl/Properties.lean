@@ -105,6 +105,10 @@ example :
   native_decide
 
 example :
+    (defaultEditorKeymap.resolveBinding ["editor"] .enter).map (·.action) = some .submit := by
+  native_decide
+
+example :
     (defaultEditorKeymap.resolve ["editor", "completion"] .escape) =
       some .dismissCompletion := by
   native_decide

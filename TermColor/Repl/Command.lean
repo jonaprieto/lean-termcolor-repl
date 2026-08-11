@@ -158,7 +158,8 @@ private def exactCommand {α : Type} (root : Argus.Command α) (input : TextInpu
   | [] => none
 
 /-- Parse a slash command using the supplied Argus command group. -/
-def parseCommand {Action : Type} (root : CommandSpec Action) (source : String) : Except String Action :=
+def parseCommand {Action : Type} (root : CommandSpec Action) (source : String) :
+    Except String Action :=
   let line := source.trimAscii.toString
   if !line.startsWith "/" then
     .error "input is not a slash command"

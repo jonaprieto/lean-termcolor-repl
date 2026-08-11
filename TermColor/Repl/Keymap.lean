@@ -62,9 +62,13 @@ private def active (contexts : List String) : Option String → Bool
   | some context => context ∈ contexts
 
 /-- First matching binding wins; list order is the precedence contract. -/
-def resolve (keymap : Keymap Action) (contexts : List String) (key : Key) : Option Action :=
+def resolveBinding (keymap : Keymap Action) (contexts : List String) (key : Key) :
+    Option (KeyBinding Action) :=
   keymap.bindings.find? (fun binding => binding.key == key && active contexts binding.context)
-    |>.map (·.action)
+
+/-- Resolve the first matching action. -/
+def resolve (keymap : Keymap Action) (contexts : List String) (key : Key) : Option Action :=
+  keymap.resolveBinding contexts key |>.map (·.action)
 
 def visible (keymap : Keymap Action) (contexts : List String) : List (KeyBinding Action) :=
   keymap.bindings.filter (fun binding => active contexts binding.context)
@@ -125,14 +129,17 @@ def defaultEditorKeymap (lineBreak : Key := .ctrl 'n') : Keymap EditorAction :=
   Keymap.fromSpecs
     [ binding [lineBreak] .lineBreak (some "multiline") (Keymap.keyLabel lineBreak)
         "insert a line break"
-    , binding [.up] .completionPrevious (some "completion") (Keymap.keyLabel .up) "previous completion"
-    , binding [.down] .completionNext (some "completion") (Keymap.keyLabel .down) "next completion"
+    , binding [.up] .completionPrevious (some "completion") (Keymap.keyLabel .up)
+        "previous completion"
+    , binding [.down] .completionNext (some "completion") (Keymap.keyLabel .down)
+        "next completion"
     , binding [.tab] .completionNext (some "completion") (Keymap.keyLabel .tab) "next completion"
     , binding [.tab] .complete (some "editor") (Keymap.keyLabel .tab) "complete input"
     , binding [.up] .historyPrevious (some "editor") (Keymap.keyLabel .up) "previous history entry"
     , binding [.down] .historyNext (some "editor") (Keymap.keyLabel .down) "next history entry"
     , binding [.enter] .submit (some "editor") (Keymap.keyLabel .enter) "submit input"
-    , binding [.escape] .dismissCompletion (some "completion") (Keymap.keyLabel .escape) "close completion menu"
+    , binding [.escape] .dismissCompletion (some "completion") (Keymap.keyLabel .escape)
+        "close completion menu"
     , binding [.escape] .quit (some "editor") (Keymap.keyLabel .escape) "quit"
     , binding [.ctrl 'x'] .forceQuit (some "editor") (Keymap.keyLabel (.ctrl 'x')) "quit"
     ]
