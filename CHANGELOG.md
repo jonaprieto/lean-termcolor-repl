@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.5 — 2026-08-13
+
+- Publish the final Lean 4.33 documentation artifact fix.
+
 ## 0.8.4 — 2026-08-13
 
 - Publish the dependency-graph README cleanup.
