@@ -54,7 +54,9 @@ lake build TermColor.Repl TermColor.Repl.Properties tests
 ## Related projects
 
 [`termcolor-terminal`](https://github.com/jonaprieto/lean-termcolor-terminal) owns terminal IO;
-[`lean-calc-chat`](https://github.com/jonaprieto/lean-calc-chat) is a complete consumer.
+[`lean-calc-chat`](https://github.com/jonaprieto/lean-calc-chat) is a complete consumer;
+[`argus`](https://github.com/jonaprieto/lean-argus) provides its command-line integration; and
+[`oatp`](https://github.com/jonaprieto/oatp) uses the REPL layer.
 
 ## License
 
