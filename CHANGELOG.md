@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.2 — 2026-08-12
+
+- Adopt Lean v4.33.0 and precommit-lean v0.1.5.
+
 ## 0.8.1
 
 - make event readers cancellation-aware and join them during terminal cleanup;
