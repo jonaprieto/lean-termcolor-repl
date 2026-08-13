@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.4 — 2026-08-13
+
+- Publish the dependency-graph README cleanup.
+
 ## 0.8.3 — 2026-08-13
 
 - Adopt precommit-lean v0.1.6.
