@@ -7,11 +7,11 @@ package «termcolor-repl» where
 
 require «termcolor-terminal» from git
   "https://github.com/jonaprieto/lean-termcolor-terminal.git"
-  @ "v0.3.1"
+  @ "v0.3.6"
 
 require argus from git
   "https://github.com/jonaprieto/lean-argus.git"
-  @ "v0.5.0"
+  @ "v0.5.3"
 
 @[default_target]
 lean_lib «TermColor.Repl» where

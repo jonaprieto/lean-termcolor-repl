@@ -3,6 +3,7 @@
 ## 0.8.6 — 2026-08-13
 
 - Add the standard review guidance to the README.
+- Pin the newest released TermColor Terminal and Argus dependencies.
 
 ## 0.8.5 — 2026-08-13
 
