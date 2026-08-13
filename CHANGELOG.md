@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.6 — 2026-08-13
+
+- Add the standard review guidance to the README.
+
 ## 0.8.5 — 2026-08-13
 
 - Publish the final Lean 4.33 documentation artifact fix.
