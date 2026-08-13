@@ -62,6 +62,7 @@ jobs:
           cp -R .lake/build/lib/lean/TermColor/. .lake/packages/termcolor/.lake/build/lib/lean/TermColor/
           mkdir -p .lake/packages/termcolor-widgets/.lake/build/lib/lean/TermColor
           cp -R .lake/packages/termcolor/.lake/build/lib/lean/TermColor/. .lake/packages/termcolor-widgets/.lake/build/lib/lean/TermColor/
+          cp -R .lake/packages/termcolor/.lake/build/lib/lean/. .lake/packages/termcolor-widgets/.lake/build/lib/lean/
           lake -d docbuild build TermColor.Repl:docs TermColor.Repl.Terminal:docs
           lake -d docbuild build TermColor.Repl.FileCompletion:docs
           touch docbuild/.lake/build/doc/.nojekyll
