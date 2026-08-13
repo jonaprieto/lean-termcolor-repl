@@ -1,4 +1,4 @@
-# termcolor-repl
+# lean-termcolor-repl
 
 [![CI](https://github.com/jonaprieto/lean-termcolor-repl/actions/workflows/ci.yml/badge.svg)](https://github.com/jonaprieto/lean-termcolor-repl/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/jonaprieto/lean-termcolor-repl?display_name=tag&sort=semver)](https://github.com/jonaprieto/lean-termcolor-repl/releases)
@@ -8,6 +8,18 @@
 
 Pure input history, key handling, adaptive completion, and cooperative background-job support for
 Lean 4 terminal REPLs.
+
+## Status and review
+
+These libraries are actively evolving and are developed with AI assistance and human review.
+CI and machine-checked proofs provide useful evidence, but do not guarantee correctness,
+soundness, portability, performance, or suitability for every use case. Validate behavior
+and assumptions before relying on a release.
+
+Reviewer feedback is welcome, especially on correctness, proofs, API design, usability,
+portability, performance, documentation, and real-world use. Please use the
+[issue tracker](https://github.com/jonaprieto/lean-termcolor-repl/issues) or open a PR with a
+reproducible example and the expected behavior.
 
 ## Install
 
