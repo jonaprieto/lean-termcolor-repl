@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.7 — 2026-09-08
+
+- Support Lean v4.33.1 and refresh Terminal and Argus dependencies.
+- Clarify AI-assisted development.
+
 ## 0.8.6 — 2026-08-13
 
 - Add the standard review guidance to the README.
