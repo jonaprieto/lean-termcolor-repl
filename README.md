@@ -9,6 +9,11 @@
 Pure input history, key handling, adaptive completion, and cooperative background-job support for
 Lean 4 terminal REPLs.
 
+## Problem
+
+Terminal REPLs repeatedly need editing, completion, history, and job handling that should not be
+rewritten for each application.
+
 ## Development
 
 This project is maintained by its author with AI-assisted development tools.
