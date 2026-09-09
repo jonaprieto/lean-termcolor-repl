@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.8 — 2026-09-09
+
+- Refresh Argus and Terminal and document the contribution policy and package problem.
+
 ## 0.8.7 — 2026-09-08
 
 - Support Lean v4.33.1 and refresh Terminal and Argus dependencies.
