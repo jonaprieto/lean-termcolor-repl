@@ -34,7 +34,9 @@ def multiline : KeyContext := ofString "multiline"
 
 end KeyContext
 
-structure KeyBinding (Action : Type) where
+structure KeyBinding
+    (Action : Type)
+    where
   key : Key
   action : Action
   context : Option KeyContext := none
@@ -42,12 +44,16 @@ structure KeyBinding (Action : Type) where
   description : String := ""
 deriving Repr
 
-structure Keymap (Action : Type) where
+structure Keymap
+    (Action : Type)
+    where
   bindings : List (KeyBinding Action) := []
 deriving Repr
 
 /-- One declarative action binding. Multiple physical keys may name one action. -/
-structure BindingSpec (Action : Type) where
+structure BindingSpec
+    (Action : Type)
+    where
   keys : List Key
   action : Action
   context : Option KeyContext := none
@@ -59,41 +65,65 @@ namespace BindingSpec
 
 variable {Action : Type}
 
-def expand (spec : BindingSpec Action) : List (KeyBinding Action) :=
+def expand
+    (spec : BindingSpec Action)
+    : List (KeyBinding Action) :=
   spec.keys.map fun key =>
     { key, action := spec.action, context := spec.context
       label := spec.label, description := spec.description }
 
 end BindingSpec
 
-def Keymap.fromSpecs {Action : Type} (specs : List (BindingSpec Action)) : Keymap Action where
+def Keymap.fromSpecs
+    {Action : Type}
+    (specs : List (BindingSpec Action))
+    : Keymap Action
+    where
   bindings := specs.flatMap BindingSpec.expand
 
 namespace Keymap
 
 variable {Action : Type}
 
-private def active (contexts : List KeyContext) : Option KeyContext → Bool
+private
+def active
+    (contexts : List KeyContext)
+    : Option KeyContext →
+      Bool
   | none => true
   | some context => contexts.any (· == context)
 
 /-- First matching binding wins; list order is the precedence contract. -/
-def resolveBinding (keymap : Keymap Action) (contexts : List KeyContext) (key : Key) :
-    Option (KeyBinding Action) :=
+def resolveBinding
+    (keymap : Keymap Action)
+    (contexts : List KeyContext)
+    (key : Key)
+    : Option (KeyBinding Action) :=
   keymap.bindings.find? (fun binding => binding.key == key && active contexts binding.context)
 
 /-- Resolve the first matching action. -/
-def resolve (keymap : Keymap Action) (contexts : List KeyContext) (key : Key) : Option Action :=
+def resolve
+    (keymap : Keymap Action)
+    (contexts : List KeyContext)
+    (key : Key)
+    : Option Action :=
   keymap.resolveBinding contexts key |>.map (·.action)
 
-def visible (keymap : Keymap Action) (contexts : List KeyContext) : List (KeyBinding Action) :=
+def visible
+    (keymap : Keymap Action)
+    (contexts : List KeyContext)
+    : List (KeyBinding Action) :=
   keymap.bindings.filter (fun binding => active contexts binding.context)
 
-def keys (keymap : Keymap Action) : List Key :=
+def keys
+    (keymap : Keymap Action)
+    : List Key :=
   keymap.bindings.map (·.key)
 
 /-- Return duplicate key/context pairs that rely on implicit first-match precedence. -/
-def conflicts (keymap : Keymap Action) : List (Key × Option KeyContext) :=
+def conflicts
+    (keymap : Keymap Action)
+    : List (Key × Option KeyContext) :=
   let step := fun (state : List (KeyBinding Action) × List (Key × Option KeyContext))
       (binding : KeyBinding Action) =>
     let (seen, conflicts) := state
@@ -106,7 +136,9 @@ def conflicts (keymap : Keymap Action) : List (Key × Option KeyContext) :=
     else (binding :: seen, conflicts)
   (keymap.bindings.foldl step ([], [])).2
 
-def keyLabel : Key → String
+def keyLabel
+    : Key →
+      String
   | .char value => s!"{value}"
   | .ctrl value => s!"Ctrl-{value}"
   | .left => "←"
@@ -146,16 +178,25 @@ structure EditorContext where
   multiline : Bool := false
 deriving Repr, BEq, DecidableEq
 
-def editorContexts (context : EditorContext) : List KeyContext :=
+def editorContexts
+    (context : EditorContext)
+    : List KeyContext :=
   let contexts := [KeyContext.editor]
   let contexts := if context.completionOpen then KeyContext.completion :: contexts else contexts
   if context.multiline then KeyContext.multiline :: contexts else contexts
 
-private def binding (keys : List Key) (action : EditorAction) (context : Option KeyContext)
-    (label description : String) : BindingSpec EditorAction :=
+private
+def binding
+    (keys : List Key)
+    (action : EditorAction)
+    (context : Option KeyContext)
+    (label description : String)
+    : BindingSpec EditorAction :=
   { keys, action, context, label, description }
 
-def defaultEditorKeymap (lineBreak : Key := .ctrl 'n') : Keymap EditorAction :=
+def defaultEditorKeymap
+    (lineBreak : Key := .ctrl 'n')
+    : Keymap EditorAction :=
   Keymap.fromSpecs
     [ binding [lineBreak] .lineBreak (some KeyContext.multiline) (Keymap.keyLabel lineBreak)
         "insert a line break"

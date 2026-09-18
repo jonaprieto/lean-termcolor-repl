@@ -27,15 +27,29 @@ structure CommandWord where
   stop : Nat
 deriving Repr, BEq, DecidableEq
 
-private def whitespace (character : Char) : Bool :=
+private
+def whitespace
+    (character : Char)
+    : Bool :=
   character == ' ' || character == '\t' || character == '\n'
 
-private def finishWord (current : List Char) (start stop : Nat)
-    (words : List CommandWord) : List CommandWord :=
+private
+def finishWord
+    (current : List Char)
+    (start stop : Nat)
+    (words : List CommandWord)
+    : List CommandWord :=
   if current.isEmpty then words
   else { value := String.ofList current.reverse, start, stop } :: words
 
-private def scanWords : List Char → Nat → List Char → Nat → List CommandWord → List CommandWord
+private
+def scanWords
+    : List Char →
+      Nat →
+      List Char →
+      Nat →
+      List CommandWord →
+      List CommandWord
   | [], index, current, start, words => finishWord current start index words
   | character :: rest, index, current, start, words =>
       if whitespace character then
@@ -45,10 +59,16 @@ private def scanWords : List Char → Nat → List Char → Nat → List Command
         scanWords rest (index + 1) (character :: current)
           (if current.isEmpty then index else start) words
 
-private def words (source : String) : List CommandWord :=
+private
+def words
+    (source : String)
+    : List CommandWord :=
   (scanWords source.toList 0 [] 0 []).reverse
 
-private def cursorRange (input : TextInputState) : Nat × Nat :=
+private
+def cursorRange
+    (input : TextInputState)
+    : Nat × Nat :=
   let chars := input.value.toList
   let cursor := min input.cursor chars.length
   let before := chars.take cursor
@@ -57,39 +77,67 @@ private def cursorRange (input : TextInputState) : Nat × Nat :=
   let stop := cursor + (after.takeWhile (fun character => !whitespace character)).length
   (start, stop)
 
-private def cursorWord (input : TextInputState) : String :=
+private
+def cursorWord
+    (input : TextInputState)
+    : String :=
   let (start, stop) := cursorRange input
   String.ofList (input.value.toList.drop start |>.take (stop - start))
 
-private def inputBeforeCursor (input : TextInputState) : String :=
+private
+def inputBeforeCursor
+    (input : TextInputState)
+    : String :=
   String.ofList (input.value.toList.take (min input.cursor input.value.toList.length))
 
-private def children {α : Type} : Argus.Command α → List (Argus.Command α)
+private
+def children
+    {α : Type}
+    : Argus.Command α →
+      List (Argus.Command α)
   | { body := .subs children, .. } => children
   | _ => []
 
-private def candidate (input : TextInputState) (replacement : String) : Completion :=
+private
+def candidate
+    (input : TextInputState)
+    (replacement : String)
+    : Completion :=
   let (start, stop) := cursorRange input
   { replacement, range := some (start, stop) }
 
-private def commandPrefix (input : TextInputState) : String :=
+private
+def commandPrefix
+    (input : TextInputState)
+    : String :=
   let (start, _) := cursorRange input
   String.ofList (input.value.toList.take start)
 
-private def argvWords (source : String) : List String :=
+private
+def argvWords
+    (source : String)
+    : List String :=
   match words source with
   | first :: rest => (first.value.drop 1).toString :: rest.map (·.value)
   | [] => []
 
-private def commandForCompletion {α : Type} (root : Argus.Command α)
-    (input : TextInputState) : Argus.Command α :=
+private
+def commandForCompletion
+    {α : Type}
+    (root : Argus.Command α)
+    (input : TextInputState)
+    : Argus.Command α :=
   match words (commandPrefix input) with
   | first :: rest =>
       root.resolve ((first.value.drop 1).toString :: rest.map (·.value))
   | [] => root
 
-private def commandCandidates {α : Type} (root : Argus.Command α) (input : TextInputState) :
-    List Completion :=
+private
+def commandCandidates
+    {α : Type}
+    (root : Argus.Command α)
+    (input : TextInputState)
+    : List Completion :=
   let fragment := cursorWord input
   let marker := if fragment.startsWith "/" then "/" else ""
   let fragment := if marker.isEmpty then fragment else fragment.drop 1 |>.toString
@@ -97,14 +145,21 @@ private def commandCandidates {α : Type} (root : Argus.Command α) (input : Tex
     |>.filter (·.startsWith fragment)
     |>.map (fun name => candidate input (marker ++ name))
 
-private def flagWords (flags : List Argus.FlagInfo) : List String :=
+private
+def flagWords
+    (flags : List Argus.FlagInfo)
+    : List String :=
   flags.flatMap fun flag =>
     let long := ["--" ++ flag.long]
     match flag.short with
     | some short => long ++ ["-" ++ short.toString]
     | none => long
 
-private def valueCandidates (input : TextInputState) (values : List String) : List Completion :=
+private
+def valueCandidates
+    (input : TextInputState)
+    (values : List String)
+    : List Completion :=
   let fragment := cursorWord input
   let hasSlash := fragment.startsWith "/"
   let normalizedValue := if hasSlash then fragment.drop 1 |>.toString else fragment
@@ -120,14 +175,21 @@ private def argumentCandidates (input : TextInputState) (typeName : String)
     let values ← values typeName
     pure (valueCandidates input values)
 
-private def optionCandidates {α : Type} (command : Argus.Command α) (input : TextInputState) :
-    List Completion :=
+private
+def optionCandidates
+    {α : Type}
+    (command : Argus.Command α)
+    (input : TextInputState)
+    : List Completion :=
   let fragment := cursorWord input
   (flagWords command.toMeta.flags).filter (·.startsWith fragment) |>.map (candidate input)
 
 /-- Parse a slash command using the supplied Argus command group. -/
-def parseCommand {Action : Type} (root : CommandSpec Action) (source : String) :
-    Except String Action :=
+def parseCommand
+    {Action : Type}
+    (root : CommandSpec Action)
+    (source : String)
+    : Except String Action :=
   let line := source.trimAscii.toString
   if !line.startsWith "/" then
     .error "input is not a slash command"
@@ -167,8 +229,11 @@ def completeCommandWith {Action : Type} (root : CommandSpec Action)
   | .none => pure []
 
 /- Complete a slash command, using command metadata for names, options, and paths. -/
-def completeCommand {Action : Type} (root : CommandSpec Action) (input : TextInputState) :
-    IO (List Completion) :=
+def completeCommand
+    {Action : Type}
+    (root : CommandSpec Action)
+    (input : TextInputState)
+    : IO (List Completion) :=
   completeCommandWith root (fun _ => pure []) input
 
 structure CommandHelp where
@@ -178,7 +243,10 @@ structure CommandHelp where
 deriving Repr, BEq, DecidableEq
 
 /-- Help rows derived from the same command group used by `parseCommand`. -/
-def commandHelp {Action : Type} (root : CommandSpec Action) : List CommandHelp :=
+def commandHelp
+    {Action : Type}
+    (root : CommandSpec Action)
+    : List CommandHelp :=
   (children root).map fun command =>
     { name := "/" ++ command.name
       usage := "/" ++ command.usageLine

@@ -67,15 +67,26 @@ inductive Action where
   | quit
 deriving Repr, BEq, DecidableEq
 
-private def inputState (value : String) : TextInputState :=
+private
+def inputState
+    (value : String)
+    : TextInputState :=
   { value, cursor := value.toList.length }
 
-private def firstNewlineFrom : List Char → Nat → Option Nat
+private
+def firstNewlineFrom
+    : List Char →
+      Nat →
+      Option Nat
   | [], _ => none
   | character :: rest, index =>
       if character == '\n' then some index else firstNewlineFrom rest (index + 1)
 
-private def lastNewlineBefore (chars : List Char) (position : Nat) : Nat :=
+private
+def lastNewlineBefore
+    (chars : List Char)
+    (position : Nat)
+    : Nat :=
   let rec go : List Char → Nat → Nat → Nat
     | [], _, last => last
     | character :: rest, index, last =>
@@ -83,7 +94,11 @@ private def lastNewlineBefore (chars : List Char) (position : Nat) : Nat :=
         else go rest (index + 1) (if character == '\n' then index + 1 else last)
   go chars 0 0
 
-private def moveVertical (up : Bool) (state : TextInputState) : TextInputState :=
+private
+def moveVertical
+    (up : Bool)
+    (state : TextInputState)
+    : TextInputState :=
   let chars := state.value.toList
   let cursor := min state.cursor chars.length
   let start := lastNewlineBefore chars cursor
@@ -102,14 +117,25 @@ private def moveVertical (up : Bool) (state : TextInputState) : TextInputState :
         let nextEnd := (firstNewlineFrom (chars.drop nextStart) nextStart).getD chars.length
         { state with cursor := min nextEnd (nextStart + column) }
 
-private def hasNewline (state : TextInputState) : Bool :=
+private
+def hasNewline
+    (state : TextInputState)
+    : Bool :=
   state.value.toList.any (· == '\n')
 
-private def updateMultilineInput (config : MultilineConfig) (key : Key)
-    (state : TextInputState) : TextInputState :=
+private
+def updateMultilineInput
+    (config : MultilineConfig)
+    (key : Key)
+    (state : TextInputState)
+    : TextInputState :=
   updateTextInput config.text key state
 
-private def insertLineBreak (config : MultilineConfig) (state : TextInputState) : TextInputState :=
+private
+def insertLineBreak
+    (config : MultilineConfig)
+    (state : TextInputState)
+    : TextInputState :=
   let cursor := min state.cursor state.value.toList.length
   if state.value.toList.length < config.text.maxLength then
     let chars := state.value.toList
@@ -118,20 +144,31 @@ private def insertLineBreak (config : MultilineConfig) (state : TextInputState) 
   else
     { state with cursor }
 
-private def commonPrefix : List Char → List Char → List Char
+private
+def commonPrefix
+    : List Char →
+      List Char →
+      List Char
   | left :: rest, right :: tail =>
       if left == right then left :: commonPrefix rest tail else []
   | _, _ => []
 
-private def sharedPrefix : List Completion → String
+private
+def sharedPrefix
+    : List Completion →
+      String
   | [] => ""
   | candidate :: rest =>
       String.ofList <| rest.foldl
         (fun shared next => commonPrefix shared next.replacement.toList)
         candidate.replacement.toList
 
-private def applyCompletion (input : TextInputState) (candidate : Completion)
-    (replacement : String := candidate.replacement) : TextInputState :=
+private
+def applyCompletion
+    (input : TextInputState)
+    (candidate : Completion)
+    (replacement : String := candidate.replacement)
+    : TextInputState :=
   let chars := input.value.toList
   let (rawStart, rawStop) := candidate.range.getD (0, chars.length)
   let start := min rawStart chars.length
@@ -140,12 +177,19 @@ private def applyCompletion (input : TextInputState) (candidate : Completion)
     (chars.take start ++ replacement.toList ++ chars.drop stop)
   { value, cursor := start + replacement.toList.length }
 
-private def completionRange (input : TextInputState) (candidate : Completion) : Nat × Nat :=
+private
+def completionRange
+    (input : TextInputState)
+    (candidate : Completion)
+    : Nat × Nat :=
   let length := input.value.toList.length
   let (rawStart, rawStop) := candidate.range.getD (0, length)
   (min rawStart length, max (min rawStart length) (min rawStop length))
 
-def completeInput (input : TextInputState) (candidates : List Completion) : TextInputState :=
+def completeInput
+    (input : TextInputState)
+    (candidates : List Completion)
+    : TextInputState :=
   match candidates with
   | [] => input
   | [candidate] => applyCompletion input candidate
@@ -156,8 +200,11 @@ def completeInput (input : TextInputState) (candidates : List Completion) : Text
       let current := String.ofList (input.value.toList.drop start |>.take (stop - start))
       if shared.length > current.length then applyCompletion input candidate shared else input
 
-def renderMultilineTextInputBody (config : TextInputConfig) (state : TextInputState)
-    (focused : Bool := false) : Text :=
+def renderMultilineTextInputBody
+    (config : TextInputConfig)
+    (state : TextInputState)
+    (focused : Bool := false)
+    : Text :=
   if !hasNewline state then
     textInputBody config state focused
   else
@@ -174,14 +221,20 @@ def renderMultilineTextInputBody (config : TextInputConfig) (state : TextInputSt
       (Text.styled before config.textStyle ++ cursorText ++ Text.styled after config.textStyle)
     align (max 1 config.width) .left content
 
-private def completionKindLabel : CompletionKind → String
+private
+def completionKindLabel
+    : CompletionKind →
+      String
   | .text => "  "
   | .file => "ƒ "
   | .directory => "▸ "
   | .executable => "⚙ "
 
 /-- Render a width-bounded completion menu with a selected row and kind markers. -/
-def renderCompletionMenu (config : CompletionMenuConfig) (menu : CompletionMenu) : Text :=
+def renderCompletionMenu
+    (config : CompletionMenuConfig)
+    (menu : CompletionMenu)
+    : Text :=
   let width := max 1 config.width
   let count := min config.maxItems menu.candidates.size
   let rows := (List.range count).filterMap fun index => do
@@ -195,7 +248,11 @@ def renderCompletionMenu (config : CompletionMenuConfig) (menu : CompletionMenu)
     else []
   align width .left (joinLines (rows ++ more))
 
-private def selectCompletion (state : State) (selected : Nat) : State :=
+private
+def selectCompletion
+    (state : State)
+    (selected : Nat)
+    : State :=
   match state.completion with
   | none => state
   | some menu =>
@@ -206,7 +263,11 @@ private def selectCompletion (state : State) (selected : Nat) : State :=
             input := applyCompletion state.input candidate
             completion := some { menu with selected } }
 
-private def cycleCompletion (state : State) (forward : Bool) : State :=
+private
+def cycleCompletion
+    (state : State)
+    (forward : Bool)
+    : State :=
   match state.completion with
   | some menu =>
       if menu.candidates.isEmpty then state
@@ -217,7 +278,11 @@ private def cycleCompletion (state : State) (forward : Bool) : State :=
         selectCompletion state selected
   | none => state
 
-private def completeWith (state : State) (candidates : List Completion) : State :=
+private
+def completeWith
+    (state : State)
+    (candidates : List Completion)
+    : State :=
   match candidates with
   | [] => { state with completion := none }
   | [_] => { state with
@@ -234,17 +299,25 @@ private def completeWith (state : State) (candidates : List Completion) : State 
       historyIndex := none
       completion := some { candidates := candidates.toArray } }
 
-private def acceptCompletion (state : State) : State :=
+private
+def acceptCompletion
+    (state : State)
+    : State :=
   match state.completion with
   | none => state
   | some menu => selectCompletion state menu.selected
 
-private def updateCommon (keymap : Keymap EditorAction) (multiline : Bool)
+private
+def updateCommon
+    (keymap : Keymap EditorAction)
+    (multiline : Bool)
     (complete : TextInputState → List Completion)
     (up down : State → State)
     (inputUpdate : Key → TextInputState → TextInputState)
     (lineBreak : TextInputState → TextInputState)
-    (state : State) (key : Key) : State × Action :=
+    (state : State)
+    (key : Key)
+    : State × Action :=
   let context := { completionOpen := state.completion.isSome, multiline }
   match keymap.resolve (editorContexts context) key with
   | some .completionPrevious =>
@@ -281,7 +354,9 @@ private def updateCommon (keymap : Keymap EditorAction) (multiline : Bool)
         historyIndex := none
         completion := none }, .changed)
 
-def recallUp (state : State) : State :=
+def recallUp
+    (state : State)
+    : State :=
   if state.history.isEmpty then state
   else
     let index := match state.historyIndex with
@@ -291,7 +366,9 @@ def recallUp (state : State) : State :=
       input := inputState (state.history.getD index "")
       historyIndex := some index }
 
-def recallDown (state : State) : State :=
+def recallDown
+    (state : State)
+    : State :=
   match state.historyIndex with
   | none => state
   | some index =>
@@ -303,8 +380,13 @@ def recallDown (state : State) : State :=
       else
         { state with input := {}, historyIndex := none }
 
-def updateMultilineWithKeymap (config : MultilineConfig) (keymap : Keymap EditorAction)
-    (complete : TextInputState → List Completion) (state : State) (key : Key) : State × Action :=
+def updateMultilineWithKeymap
+    (config : MultilineConfig)
+    (keymap : Keymap EditorAction)
+    (complete : TextInputState → List Completion)
+    (state : State)
+    (key : Key)
+    : State × Action :=
   updateCommon keymap true complete
     (fun state =>
       if hasNewline state.input then
@@ -317,18 +399,31 @@ def updateMultilineWithKeymap (config : MultilineConfig) (keymap : Keymap Editor
     (fun key input => updateMultilineInput config key input)
     (insertLineBreak config) state key
 
-def updateMultiline (config : MultilineConfig) (complete : TextInputState → List Completion)
-    (state : State) (key : Key) : State × Action :=
+def updateMultiline
+    (config : MultilineConfig)
+    (complete : TextInputState → List Completion)
+    (state : State)
+    (key : Key)
+    : State × Action :=
   updateMultilineWithKeymap config (config.keymap.getD (defaultEditorKeymap config.lineBreak))
     complete state key
 
-def updateWithKeymap (config : TextInputConfig) (keymap : Keymap EditorAction)
-    (complete : TextInputState → List Completion) (state : State) (key : Key) : State × Action :=
+def updateWithKeymap
+    (config : TextInputConfig)
+    (keymap : Keymap EditorAction)
+    (complete : TextInputState → List Completion)
+    (state : State)
+    (key : Key)
+    : State × Action :=
   updateCommon keymap false complete recallUp recallDown
     (fun key input => updateTextInput config key input) id state key
 
-def update (config : TextInputConfig) (complete : TextInputState → List Completion)
-    (state : State) (key : Key) : State × Action :=
+def update
+    (config : TextInputConfig)
+    (complete : TextInputState → List Completion)
+    (state : State)
+    (key : Key)
+    : State × Action :=
   updateWithKeymap config defaultEditorKeymap complete state key
 
 end TermColor.Repl

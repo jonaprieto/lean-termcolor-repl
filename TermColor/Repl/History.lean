@@ -21,11 +21,18 @@ structure HistoryConfig where
   deduplicate : Bool := true
 deriving Repr
 
-private def trimHistory (maxEntries : Nat) (history : List String) : List String :=
+private
+def trimHistory
+    (maxEntries : Nat)
+    (history : List String)
+    : List String :=
   if history.length > maxEntries then history.drop (history.length - maxEntries) else history
 
 /-- Normalize lines, skipping empty lines and optionally keeping the newest duplicate. -/
-def normalizeHistory (config : HistoryConfig) (lines : List String) : Array String :=
+def normalizeHistory
+    (config : HistoryConfig)
+    (lines : List String)
+    : Array String :=
   let append (history : List String) (line : String) : List String :=
     let line := line.trimAscii.toString
     if line.isEmpty then history
@@ -34,7 +41,10 @@ def normalizeHistory (config : HistoryConfig) (lines : List String) : Array Stri
       trimHistory config.maxEntries (history ++ [line])
   (lines.foldl append []).toArray
 
-private def serializeHistory (history : Array String) : String :=
+private
+def serializeHistory
+    (history : Array String)
+    : String :=
   if history.isEmpty then "" else String.intercalate "\n" history.toList ++ "\n"
 
 /-- Read persisted history. Missing, unreadable, or malformed files return an error. -/
