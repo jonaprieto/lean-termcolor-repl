@@ -34,12 +34,14 @@ def new : IO Cancellation := do
 
 def cancel
     (token : Cancellation)
-    : IO Unit :=
+    : IO Unit
+    :=
   token.token.cancel
 
 def isCancelled
     (token : Cancellation)
-    : IO Bool :=
+    : IO Bool
+    :=
   token.token.isCancelled
 
 def sleep
@@ -263,7 +265,8 @@ def readKeyWithResize
     (wake : IO Bool := pure false)
     (reader : Option KeyReader := none)
     (wakeSignal : Option Std.Notify := none)
-    : IO (Screen × Option Key) :=
+    : IO (Screen × Option Key)
+    :=
   readKeyWithResizeAtSize tickMs fallback screen (fun screen _ => render screen)
     wake reader wakeSignal
 
@@ -315,7 +318,8 @@ def renderAtSize
     (screen : Screen)
     (model : Model)
     (size : Size)
-    : IO Screen :=
+    : IO Screen
+    :=
   screen.render (config.view model size)
 
 private

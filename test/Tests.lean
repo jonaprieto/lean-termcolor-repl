@@ -14,7 +14,8 @@ private
 def check
     (name : String)
     (condition : Bool)
-    : Option String :=
+    : Option String
+    :=
   if condition then none else some name
 
 private def nestedCommand : Argus.Command Unit :=
@@ -24,7 +25,8 @@ private def nestedCommand : Argus.Command Unit :=
 private
 def names
     (completions : List Completion)
-    : List String :=
+    : List String
+    :=
   completions.map (·.replacement)
 
 def main
