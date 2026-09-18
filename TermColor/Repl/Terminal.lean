@@ -42,7 +42,10 @@ def isCancelled
     : IO Bool :=
   token.token.isCancelled
 
-def sleep (token : Cancellation) (milliseconds : UInt32) : IO Bool := do
+def sleep
+    (token : Cancellation)
+    (milliseconds : UInt32)
+    : IO Bool := do
   if ← token.isCancelled then
     pure false
   else
@@ -73,7 +76,9 @@ def new : IO KeyReader := do
     signal := ← Std.Notify.new
   }
 
-def ensureReading (reader : KeyReader) : IO Unit := do
+def ensureReading
+    (reader : KeyReader)
+    : IO Unit := do
   unless ← reader.active.get do
     reader.active.set true
     let _task ← IO.asTask do
@@ -99,7 +104,11 @@ private def newEventReader : IO EventReader := do
     task := ← IO.mkRef none
   }
 
-private def ensureEventReading (reader : EventReader) (keepGoing : IO Bool) : IO Unit := do
+private
+def ensureEventReading
+    (reader : EventReader)
+    (keepGoing : IO Bool)
+    : IO Unit := do
   unless (← reader.active.get) || (← reader.result.get).isSome do
     reader.active.set true
     let task ← IO.asTask do
@@ -110,13 +119,19 @@ private def ensureEventReading (reader : EventReader) (keepGoing : IO Bool) : IO
         reader.signal.notify
     reader.task.set (some task)
 
-private def takeEvent (reader : EventReader) : IO (Option (Option Event)) := do
+private
+def takeEvent
+    (reader : EventReader)
+    : IO (Option (Option Event)) := do
   let result ← reader.result.get
   if result.isSome then
     reader.result.set none
   pure result
 
-private def waitEventReader (reader : EventReader) : IO Unit := do
+private
+def waitEventReader
+    (reader : EventReader)
+    : IO Unit := do
   while ← reader.active.get do
     IO.sleep 1
   match ← reader.task.get with
@@ -182,11 +197,17 @@ structure Config
   isRunning : Model → Bool
   quit : Model → Model
 
-def currentSize (fallback : Size) : IO Size := do
+def currentSize
+    (fallback : Size)
+    : IO Size := do
   pure ((← terminalSize).getD fallback)
 
-private def waitForEvent (tickMs : UInt32) (signal : Std.Notify)
-    (wakeSignal : Option Std.Notify) : IO Bool := do
+private
+def waitForEvent
+    (tickMs : UInt32)
+    (signal : Std.Notify)
+    (wakeSignal : Option Std.Notify)
+    : IO Bool := do
   match wakeSignal with
   | none =>
       IO.sleep tickMs
@@ -207,8 +228,9 @@ def readKeyWithResizeAtSize
     (screen : Screen)
     (render : Screen → Size → IO Screen)
     (wake : IO Bool := pure false)
-    (reader : Option KeyReader := none) (wakeSignal : Option Std.Notify := none) :
-    IO (Screen × Option Key) := do
+    (reader : Option KeyReader := none)
+    (wakeSignal : Option Std.Notify := none)
+    : IO (Screen × Option Key) := do
   let reader ← match reader with
     | some reader => pure reader
     | none => KeyReader.new
@@ -239,8 +261,9 @@ def readKeyWithResize
     (screen : Screen)
     (render : Screen → IO Screen)
     (wake : IO Bool := pure false)
-    (reader : Option KeyReader := none) (wakeSignal : Option Std.Notify := none) :
-    IO (Screen × Option Key) :=
+    (reader : Option KeyReader := none)
+    (wakeSignal : Option Std.Notify := none)
+    : IO (Screen × Option Key) :=
   readKeyWithResizeAtSize tickMs fallback screen (fun screen _ => render screen)
     wake reader wakeSignal
 
@@ -251,9 +274,10 @@ def readEventWithResizeAtSize
     (screen : Screen)
     (render : Screen → Size → IO Screen)
     (wake : IO Bool := pure false)
-    (reader : Option EventReader := none) (wakeSignal : Option Std.Notify := none)
-    (keepGoing : IO Bool := pure true) :
-    IO (Screen × Option Event × Bool) := do
+    (reader : Option EventReader := none)
+    (wakeSignal : Option Std.Notify := none)
+    (keepGoing : IO Bool := pure true)
+    : IO (Screen × Option Event × Bool) := do
   let reader ← match reader with
     | some reader => pure reader
     | none => newEventReader
@@ -294,11 +318,19 @@ def renderAtSize
     : IO Screen :=
   screen.render (config.view model size)
 
-private def render {Model : Type} (config : Config Model) (screen : Screen)
-    (model : Model) : IO Screen := do
+private
+def render
+    {Model : Type}
+    (config : Config Model)
+    (screen : Screen)
+    (model : Model)
+    : IO Screen := do
   renderAtSize config screen model (← currentSize config.fallbackSize)
 
-def run {Model : Type} (config : Config Model) : IO Unit := do
+def run
+    {Model : Type}
+    (config : Config Model)
+    : IO Unit := do
   hideCursor
   let cancellation ← Cancellation.new
   let reader ← newEventReader
@@ -485,7 +517,10 @@ def run {Model : Type} (config : Config Model) : IO Unit := do
     showCursor
     clearScreen
 
-def suspend {α : Type} (action : IO α) : IO (Screen × α) := do
+def suspend
+    {α : Type}
+    (action : IO α)
+    : IO (Screen × α) := do
   clearScreen
   try
     let result ← action

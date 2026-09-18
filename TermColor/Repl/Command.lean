@@ -167,9 +167,13 @@ def valueCandidates
   values.filter (·.startsWith normalizedValue) |>.map
     (fun value => candidate input (replacementPrefix ++ value))
 
-private def argumentCandidates (input : TextInputState) (typeName : String)
-    (isPath : Bool) (values : String → IO (List String)) :
-    IO (List Completion) := do
+private
+def argumentCandidates
+    (input : TextInputState)
+    (typeName : String)
+    (isPath : Bool)
+    (values : String → IO (List String))
+    : IO (List Completion) := do
   if isPath then defaultFileCompletions input
   else
     let values ← values typeName
@@ -205,9 +209,12 @@ def parseCommand
 
 /-! Complete finite values through a type-name resolver; the command grammar still supplies the
 field location, option order, and path behavior. This keeps dynamic catalogues out of the parser. -/
-def completeCommandWith {Action : Type} (root : CommandSpec Action)
-    (values : String → IO (List String)) (input : TextInputState) :
-    IO (List Completion) := do
+def completeCommandWith
+    {Action : Type}
+    (root : CommandSpec Action)
+    (values : String → IO (List String))
+    (input : TextInputState)
+    : IO (List Completion) := do
   let before := inputBeforeCursor input
   let value := before.trimAscii.toString
   if !value.startsWith "/" then

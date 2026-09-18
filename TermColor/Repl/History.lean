@@ -48,7 +48,9 @@ def serializeHistory
   if history.isEmpty then "" else String.intercalate "\n" history.toList ++ "\n"
 
 /-- Read persisted history. Missing, unreadable, or malformed files return an error. -/
-def loadHistory (config : HistoryConfig) : IO (Except String (Array String)) := do
+def loadHistory
+    (config : HistoryConfig)
+    : IO (Except String (Array String)) := do
   try
     let contents ← IO.FS.readFile config.path
     pure (.ok (normalizeHistory config (contents.splitOn "\n")))
@@ -56,7 +58,10 @@ def loadHistory (config : HistoryConfig) : IO (Except String (Array String)) := 
     pure (.error error.toString)
 
 /-- Write history without changing the caller's active in-memory state on failure. -/
-def saveHistory (config : HistoryConfig) (history : Array String) : IO (Except String Unit) := do
+def saveHistory
+    (config : HistoryConfig)
+    (history : Array String)
+    : IO (Except String Unit) := do
   try
     let normalized := normalizeHistory config history.toList
     IO.FS.writeFile config.path (serializeHistory normalized)
