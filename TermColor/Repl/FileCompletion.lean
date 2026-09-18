@@ -66,8 +66,13 @@ def replacementPrefix
     if token.startsWith ("." ++ separator) then "." ++ separator else ""
   else parent.toString ++ separator
 
-private def completionFor (token : String) (start stop : Nat)
-    (entry : IO.FS.DirEntry) (directory : System.FilePath) : IO Completion := do
+private
+def completionFor
+    (token : String)
+    (start stop : Nat)
+    (entry : IO.FS.DirEntry)
+    (directory : System.FilePath)
+    : IO Completion := do
   let isDirectory ← entry.path.isDir.toIO
   pure {
     replacement := replacementPrefix token directory ++ entry.fileName ++
@@ -76,8 +81,10 @@ private def completionFor (token : String) (start stop : Nat)
     kind := if isDirectory then .directory else .file
     range := some (start, stop) }
 
-def fileCompletions (config : FileCompletionConfig) (input : TextInputState) :
-    IO (List Completion) := do
+def fileCompletions
+    (config : FileCompletionConfig)
+    (input : TextInputState)
+    : IO (List Completion) := do
   if config.maxCandidates == 0 then
     return []
   let (start, stop) := tokenRange input
