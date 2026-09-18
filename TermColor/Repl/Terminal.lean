@@ -32,10 +32,14 @@ namespace Cancellation
 def new : IO Cancellation := do
   pure { token := ← Std.CancellationToken.new }
 
-def cancel (token : Cancellation) : IO Unit :=
+def cancel
+    (token : Cancellation)
+    : IO Unit :=
   token.token.cancel
 
-def isCancelled (token : Cancellation) : IO Bool :=
+def isCancelled
+    (token : Cancellation)
+    : IO Bool :=
   token.token.isCancelled
 
 def sleep (token : Cancellation) (milliseconds : UInt32) : IO Bool := do
@@ -125,7 +129,9 @@ Multiple submitted lines may run at the same time. The renderer remains the
 owner of `Model` and `Screen`; each worker returns only model state which is
 merged through `finish` when its result is drained.
 -/
-structure JobConfig (Model : Type) where
+structure JobConfig
+    (Model : Type)
+    where
   shouldRun : Model → String → Bool := fun _ _ => true
   start : Model → String → Model
   run : Cancellation → Model → String → IO Model
@@ -137,7 +143,9 @@ structure JobConfig (Model : Type) where
 
 /-! ## Application keymaps -/
 
-structure AppKeymap (Model : Type) where
+structure AppKeymap
+    (Model : Type)
+    where
   Action : Type
   keymap : Keymap Action
   contexts : Model → List KeyContext := fun _ => []
@@ -147,7 +155,9 @@ def defaultFallbackSize : Size := { columns := 80, rows := 24 }
 
 def defaultTickMs : UInt32 := 60
 
-structure Config (Model : Type) where
+structure Config
+    (Model : Type)
+    where
   initial : Model
   inputConfig : TextInputConfig
   multiline : Option MultilineConfig := none
@@ -190,8 +200,13 @@ private def waitForEvent (tickMs : UInt32) (signal : Std.Notify)
         .case timer (fun _ => pure true)
       ]).block
 
-private def readKeyWithResizeAtSize (tickMs : UInt32) (fallback : Size) (screen : Screen)
-    (render : Screen → Size → IO Screen) (wake : IO Bool := pure false)
+private
+def readKeyWithResizeAtSize
+    (tickMs : UInt32)
+    (fallback : Size)
+    (screen : Screen)
+    (render : Screen → Size → IO Screen)
+    (wake : IO Bool := pure false)
     (reader : Option KeyReader := none) (wakeSignal : Option Std.Notify := none) :
     IO (Screen × Option Key) := do
   let reader ← match reader with
@@ -218,15 +233,24 @@ private def readKeyWithResizeAtSize (tickMs : UInt32) (fallback : Size) (screen 
     reader.active.set false
     pure (screen, key)
 
-def readKeyWithResize (tickMs : UInt32) (fallback : Size) (screen : Screen)
-    (render : Screen → IO Screen) (wake : IO Bool := pure false)
+def readKeyWithResize
+    (tickMs : UInt32)
+    (fallback : Size)
+    (screen : Screen)
+    (render : Screen → IO Screen)
+    (wake : IO Bool := pure false)
     (reader : Option KeyReader := none) (wakeSignal : Option Std.Notify := none) :
     IO (Screen × Option Key) :=
   readKeyWithResizeAtSize tickMs fallback screen (fun screen _ => render screen)
     wake reader wakeSignal
 
-private def readEventWithResizeAtSize (tickMs : UInt32) (fallback : Size) (screen : Screen)
-    (render : Screen → Size → IO Screen) (wake : IO Bool := pure false)
+private
+def readEventWithResizeAtSize
+    (tickMs : UInt32)
+    (fallback : Size)
+    (screen : Screen)
+    (render : Screen → Size → IO Screen)
+    (wake : IO Bool := pure false)
     (reader : Option EventReader := none) (wakeSignal : Option Std.Notify := none)
     (keepGoing : IO Bool := pure true) :
     IO (Screen × Option Event × Bool) := do
@@ -252,13 +276,22 @@ private def readEventWithResizeAtSize (tickMs : UInt32) (fallback : Size) (scree
     let event := (← takeEvent reader).getD none
     pure (screen, event, false)
 
-private structure JobRuntime (Model : Type) where
+private
+structure JobRuntime
+    (Model : Type)
+    where
   cancellation : Cancellation
   result : IO.Ref (Option (Except String Model))
   task : Task (Except IO.Error Unit)
 
-private def renderAtSize {Model : Type} (config : Config Model) (screen : Screen)
-    (model : Model) (size : Size) : IO Screen :=
+private
+def renderAtSize
+    {Model : Type}
+    (config : Config Model)
+    (screen : Screen)
+    (model : Model)
+    (size : Size)
+    : IO Screen :=
   screen.render (config.view model size)
 
 private def render {Model : Type} (config : Config Model) (screen : Screen)

@@ -13,12 +13,18 @@ open TermColor.Widgets
 
 private def config : TextInputConfig := { width := 120, maxLength := 120 }
 
-private def commandCompletion : TextInputState → List Completion
+private
+def commandCompletion
+    : TextInputState →
+      List Completion
   | input =>
       ["/help", "/history"].filter (·.startsWith input.value) |>.map
         (fun replacement => { replacement })
 
-private def overlappingCompletion : TextInputState → List Completion
+private
+def overlappingCompletion
+    : TextInputState →
+      List Completion
   | input =>
       ["/to-lean", "/to-tptp"].filter (·.startsWith input.value) |>.map
         (fun replacement => { replacement, range := some (0, input.value.length) })
@@ -27,15 +33,17 @@ private def historyConfig : HistoryConfig := { path := "history", maxEntries := 
 
 private def multilineConfig : MultilineConfig := { text := config }
 
-private def customEditorKeymap : Keymap EditorAction :=
+private
+def customEditorKeymap
+    : Keymap EditorAction :=
   Keymap.fromSpecs [{ keys := [.ctrl 's'], action := .submit, context := some KeyContext.editor }]
 
-example :
-    (recallUp { history := #["first", "second"] }).input.value = "second" := by
+example
+    : (recallUp { history := #["first", "second"] }).input.value = "second" := by
   native_decide
 
-example :
-    (recallDown { history := #["first", "second"], historyIndex := some 0 }).input.value =
+example
+    : (recallDown { history := #["first", "second"], historyIndex := some 0 }).input.value =
       "second" := by
   native_decide
 
@@ -54,18 +62,19 @@ example :
       [{ replacement := "main.lean", range := some (6, 12) }]).value = "/load main.lean" := by
   native_decide
 
-example :
-    (update config commandCompletion { input := { value := "/", cursor := 1 }} .tab).1.completion =
+example
+    : (update config commandCompletion
+      { input := { value := "/", cursor := 1 }} .tab).1.completion =
       some { candidates := #[{ replacement := "/help" }, { replacement := "/history" }] } := by
   native_decide
 
-example :
-    (renderCompletionMenu { width := 8 } { candidates := #[{ replacement := "long" }] }).plainText
+example
+    : (renderCompletionMenu { width := 8 } { candidates := #[{ replacement := "long" }] }).plainText
       |>.splitOn "\n" |>.all (·.length ≤ 8) := by
   native_decide
 
-example :
-    (update config commandCompletion { input := { value := "2+2", cursor := 3 }} .enter).2 =
+example
+    : (update config commandCompletion { input := { value := "2+2", cursor := 3 }} .enter).2 =
       .submit "2+2" := by
   native_decide
 
@@ -80,8 +89,8 @@ example :
       #["first", "third"] := by
   native_decide
 
-example :
-    normalizeHistory { historyConfig with deduplicate := false } ["first", "first"] =
+example
+    : normalizeHistory { historyConfig with deduplicate := false } ["first", "first"] =
       #["first", "first"] := by
   native_decide
 
@@ -100,8 +109,8 @@ example :
       { input := { value := "a\nb", cursor := 3 }} .enter).2 = .submit "a\nb" := by
   native_decide
 
-example :
-    (defaultEditorKeymap.resolve [KeyContext.editor] .enter) = some .submit := by
+example
+    : (defaultEditorKeymap.resolve [KeyContext.editor] .enter) = some .submit := by
   native_decide
 
 example :
@@ -109,8 +118,8 @@ example :
       some .submit := by
   native_decide
 
-example :
-    defaultEditorKeymap.conflicts = [] := by
+example
+    : defaultEditorKeymap.conflicts = [] := by
   native_decide
 
 example :
@@ -133,8 +142,8 @@ example :
       { input := { value := "p", cursor := 1 }} .enter).1.input.value = "p\n" := by
   native_decide
 
-example :
-    (customEditorKeymap.resolve [KeyContext.editor] (.ctrl 's')) = some .submit := by
+example
+    : (customEditorKeymap.resolve [KeyContext.editor] (.ctrl 's')) = some .submit := by
   native_decide
 
 example :
@@ -149,7 +158,8 @@ example :
       .submit "p => p" := by
   native_decide
 
-example : Keymap.keyLabel (.ctrl 's') = "Ctrl-s" := by
+example
+    : Keymap.keyLabel (.ctrl 's') = "Ctrl-s" := by
   native_decide
 
 end TermColor.Repl.Properties

@@ -21,10 +21,17 @@ structure FileCompletionConfig where
   includeHidden : Bool := false
 deriving Repr
 
-private def whitespace (character : Char) : Bool :=
+private
+def whitespace
+    (character : Char)
+    : Bool :=
   character == ' ' || character == '\t' || character == '\n'
 
-private def tokenStart (chars : List Char) (cursor : Nat) : Nat :=
+private
+def tokenStart
+    (chars : List Char)
+    (cursor : Nat)
+    : Nat :=
   let rec go : List Char → Nat → Nat → Nat
     | [], _, start => start
     | character :: rest, index, start =>
@@ -32,7 +39,10 @@ private def tokenStart (chars : List Char) (cursor : Nat) : Nat :=
         else go rest (index + 1) (if whitespace character then index + 1 else start)
   go chars 0 0
 
-private def tokenRange (input : TextInputState) : Nat × Nat :=
+private
+def tokenRange
+    (input : TextInputState)
+    : Nat × Nat :=
   let chars := input.value.toList
   let cursor := min input.cursor chars.length
   let start := tokenStart chars cursor
@@ -40,10 +50,17 @@ private def tokenRange (input : TextInputState) : Nat × Nat :=
     ((chars.drop cursor).takeWhile (fun character => !whitespace character)).length
   (start, stop)
 
-private def safeReadDir (directory : System.FilePath) : IO (Array IO.FS.DirEntry) :=
+private
+def safeReadDir
+    (directory : System.FilePath)
+    : IO (Array IO.FS.DirEntry) :=
   try directory.readDir catch _ => pure #[]
 
-private def replacementPrefix (token : String) (parent : System.FilePath) : String :=
+private
+def replacementPrefix
+    (token : String)
+    (parent : System.FilePath)
+    : String :=
   let separator := System.FilePath.pathSeparator.toString
   if parent.toString == "." then
     if token.startsWith ("." ++ separator) then "." ++ separator else ""
@@ -76,7 +93,9 @@ def fileCompletions (config : FileCompletionConfig) (input : TextInputState) :
   pure ((completions.mergeSort (fun left right => left.label < right.label)).take
     config.maxCandidates)
 
-def defaultFileCompletions (input : TextInputState) : IO (List Completion) :=
+def defaultFileCompletions
+    (input : TextInputState)
+    : IO (List Completion) :=
   fileCompletions {} input
 
 end TermColor.Repl

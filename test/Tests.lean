@@ -10,14 +10,23 @@ open TermColor
 open TermColor.Repl
 open TermColor.Widgets
 
-private def check (name : String) (condition : Bool) : Option String :=
+private
+def check
+    (name : String)
+    (condition : Bool)
+    : Option String :=
   if condition then none else some name
 
-private def nestedCommand : Argus.Command Unit :=
+private
+def nestedCommand
+    : Argus.Command Unit :=
   Argus.group "tool"
     [Argus.group "parent" [Argus.cmd "child" (Spec.const ())]]
 
-private def names (completions : List Completion) : List String :=
+private
+def names
+    (completions : List Completion)
+    : List String :=
   completions.map (·.replacement)
 
 def main (_argv : List String) : IO UInt32 := do
