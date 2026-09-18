@@ -24,14 +24,16 @@ deriving Repr
 private
 def whitespace
     (character : Char)
-    : Bool :=
+    : Bool
+    :=
   character == ' ' || character == '\t' || character == '\n'
 
 private
 def tokenStart
     (chars : List Char)
     (cursor : Nat)
-    : Nat :=
+    : Nat
+    :=
   let rec go : List Char → Nat → Nat → Nat
     | [], _, start => start
     | character :: rest, index, start =>
@@ -42,7 +44,8 @@ def tokenStart
 private
 def tokenRange
     (input : TextInputState)
-    : Nat × Nat :=
+    : Nat × Nat
+    :=
   let chars := input.value.toList
   let cursor := min input.cursor chars.length
   let start := tokenStart chars cursor
@@ -53,14 +56,16 @@ def tokenRange
 private
 def safeReadDir
     (directory : System.FilePath)
-    : IO (Array IO.FS.DirEntry) :=
+    : IO (Array IO.FS.DirEntry)
+    :=
   try directory.readDir catch _ => pure #[]
 
 private
 def replacementPrefix
     (token : String)
     (parent : System.FilePath)
-    : String :=
+    : String
+    :=
   let separator := System.FilePath.pathSeparator.toString
   if parent.toString == "." then
     if token.startsWith ("." ++ separator) then "." ++ separator else ""
@@ -102,7 +107,8 @@ def fileCompletions
 
 def defaultFileCompletions
     (input : TextInputState)
-    : IO (List Completion) :=
+    : IO (List Completion)
+    :=
   fileCompletions {} input
 
 end TermColor.Repl

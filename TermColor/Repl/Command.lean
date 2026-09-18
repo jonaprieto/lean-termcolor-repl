@@ -30,7 +30,8 @@ deriving Repr, BEq, DecidableEq
 private
 def whitespace
     (character : Char)
-    : Bool :=
+    : Bool
+    :=
   character == ' ' || character == '\t' || character == '\n'
 
 private
@@ -38,7 +39,8 @@ def finishWord
     (current : List Char)
     (start stop : Nat)
     (words : List CommandWord)
-    : List CommandWord :=
+    : List CommandWord
+    :=
   if current.isEmpty then words
   else { value := String.ofList current.reverse, start, stop } :: words
 
@@ -62,13 +64,15 @@ def scanWords
 private
 def words
     (source : String)
-    : List CommandWord :=
+    : List CommandWord
+    :=
   (scanWords source.toList 0 [] 0 []).reverse
 
 private
 def cursorRange
     (input : TextInputState)
-    : Nat × Nat :=
+    : Nat × Nat
+    :=
   let chars := input.value.toList
   let cursor := min input.cursor chars.length
   let before := chars.take cursor
@@ -80,14 +84,16 @@ def cursorRange
 private
 def cursorWord
     (input : TextInputState)
-    : String :=
+    : String
+    :=
   let (start, stop) := cursorRange input
   String.ofList (input.value.toList.drop start |>.take (stop - start))
 
 private
 def inputBeforeCursor
     (input : TextInputState)
-    : String :=
+    : String
+    :=
   String.ofList (input.value.toList.take (min input.cursor input.value.toList.length))
 
 private
@@ -102,21 +108,24 @@ private
 def candidate
     (input : TextInputState)
     (replacement : String)
-    : Completion :=
+    : Completion
+    :=
   let (start, stop) := cursorRange input
   { replacement, range := some (start, stop) }
 
 private
 def commandPrefix
     (input : TextInputState)
-    : String :=
+    : String
+    :=
   let (start, _) := cursorRange input
   String.ofList (input.value.toList.take start)
 
 private
 def argvWords
     (source : String)
-    : List String :=
+    : List String
+    :=
   match words source with
   | first :: rest => (first.value.drop 1).toString :: rest.map (·.value)
   | [] => []
@@ -126,7 +135,8 @@ def commandForCompletion
     {α : Type}
     (root : Argus.Command α)
     (input : TextInputState)
-    : Argus.Command α :=
+    : Argus.Command α
+    :=
   match words (commandPrefix input) with
   | first :: rest =>
       root.resolve ((first.value.drop 1).toString :: rest.map (·.value))
@@ -137,7 +147,8 @@ def commandCandidates
     {α : Type}
     (root : Argus.Command α)
     (input : TextInputState)
-    : List Completion :=
+    : List Completion
+    :=
   let fragment := cursorWord input
   let marker := if fragment.startsWith "/" then "/" else ""
   let fragment := if marker.isEmpty then fragment else fragment.drop 1 |>.toString
@@ -148,7 +159,8 @@ def commandCandidates
 private
 def flagWords
     (flags : List Argus.FlagInfo)
-    : List String :=
+    : List String
+    :=
   flags.flatMap fun flag =>
     let long := ["--" ++ flag.long]
     match flag.short with
@@ -159,7 +171,8 @@ private
 def valueCandidates
     (input : TextInputState)
     (values : List String)
-    : List Completion :=
+    : List Completion
+    :=
   let fragment := cursorWord input
   let hasSlash := fragment.startsWith "/"
   let normalizedValue := if hasSlash then fragment.drop 1 |>.toString else fragment
@@ -184,7 +197,8 @@ def optionCandidates
     {α : Type}
     (command : Argus.Command α)
     (input : TextInputState)
-    : List Completion :=
+    : List Completion
+    :=
   let fragment := cursorWord input
   (flagWords command.toMeta.flags).filter (·.startsWith fragment) |>.map (candidate input)
 
@@ -193,7 +207,8 @@ def parseCommand
     {Action : Type}
     (root : CommandSpec Action)
     (source : String)
-    : Except String Action :=
+    : Except String Action
+    :=
   let line := source.trimAscii.toString
   if !line.startsWith "/" then
     .error "input is not a slash command"
@@ -240,7 +255,8 @@ def completeCommand
     {Action : Type}
     (root : CommandSpec Action)
     (input : TextInputState)
-    : IO (List Completion) :=
+    : IO (List Completion)
+    :=
   completeCommandWith root (fun _ => pure []) input
 
 structure CommandHelp where
@@ -253,7 +269,8 @@ deriving Repr, BEq, DecidableEq
 def commandHelp
     {Action : Type}
     (root : CommandSpec Action)
-    : List CommandHelp :=
+    : List CommandHelp
+    :=
   (children root).map fun command =>
     { name := "/" ++ command.name
       usage := "/" ++ command.usageLine

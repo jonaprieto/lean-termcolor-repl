@@ -25,14 +25,16 @@ private
 def trimHistory
     (maxEntries : Nat)
     (history : List String)
-    : List String :=
+    : List String
+    :=
   if history.length > maxEntries then history.drop (history.length - maxEntries) else history
 
 /-- Normalize lines, skipping empty lines and optionally keeping the newest duplicate. -/
 def normalizeHistory
     (config : HistoryConfig)
     (lines : List String)
-    : Array String :=
+    : Array String
+    :=
   let append (history : List String) (line : String) : List String :=
     let line := line.trimAscii.toString
     if line.isEmpty then history
@@ -44,7 +46,8 @@ def normalizeHistory
 private
 def serializeHistory
     (history : Array String)
-    : String :=
+    : String
+    :=
   if history.isEmpty then "" else String.intercalate "\n" history.toList ++ "\n"
 
 /-- Read persisted history. Missing, unreadable, or malformed files return an error. -/
