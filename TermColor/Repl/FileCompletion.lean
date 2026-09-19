@@ -77,7 +77,8 @@ def completionFor
     (start stop : Nat)
     (entry : IO.FS.DirEntry)
     (directory : System.FilePath)
-    : IO Completion := do
+    : IO Completion
+    := do
   let isDirectory ← entry.path.isDir.toIO
   pure {
     replacement := replacementPrefix token directory ++ entry.fileName ++
@@ -89,7 +90,8 @@ def completionFor
 def fileCompletions
     (config : FileCompletionConfig)
     (input : TextInputState)
-    : IO (List Completion) := do
+    : IO (List Completion)
+    := do
   if config.maxCandidates == 0 then
     return []
   let (start, stop) := tokenRange input

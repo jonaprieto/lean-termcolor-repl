@@ -186,7 +186,8 @@ def argumentCandidates
     (typeName : String)
     (isPath : Bool)
     (values : String → IO (List String))
-    : IO (List Completion) := do
+    : IO (List Completion)
+    := do
   if isPath then defaultFileCompletions input
   else
     let values ← values typeName
@@ -229,7 +230,8 @@ def completeCommandWith
     (root : CommandSpec Action)
     (values : String → IO (List String))
     (input : TextInputState)
-    : IO (List Completion) := do
+    : IO (List Completion)
+    := do
   let before := inputBeforeCursor input
   let value := before.trimAscii.toString
   if !value.startsWith "/" then

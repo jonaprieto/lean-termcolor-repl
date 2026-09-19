@@ -33,31 +33,38 @@ private def historyConfig : HistoryConfig := { path := "history", maxEntries := 
 
 private def multilineConfig : MultilineConfig := { text := config }
 
-private def customEditorKeymap : Keymap EditorAction :=
+private
+def customEditorKeymap
+    : Keymap EditorAction
+    :=
   Keymap.fromSpecs [{ keys := [.ctrl 's'], action := .submit, context := some KeyContext.editor }]
 
-example :
-    (recallUp { history := #["first", "second"] }).input.value = "second" := by
+example
+    : (recallUp { history := #["first", "second"] }).input.value = "second"
+    := by
   native_decide
 
-example :
-    (recallDown { history := #["first", "second"], historyIndex := some 0 }).input.value =
-      "second" := by
+example
+    : (recallDown { history := #["first", "second"], historyIndex := some 0 }).input.value =
+      "second"
+    := by
   native_decide
 
-example :
-    (completeInput { value := "/he", cursor := 3 }
-      [{ replacement := "/help" }]).value = "/help" := by
+example
+    : (completeInput { value := "/he", cursor := 3 } [{ replacement := "/help" }]).value = "/help"
+    := by
   native_decide
 
-example :
-    (completeInput { value := "/h", cursor := 2 }
-      [{ replacement := "/help" }, { replacement := "/history" }]).value = "/h" := by
+example
+    : (completeInput { value := "/h", cursor := 2 }
+      [{ replacement := "/help" }, { replacement := "/history" }]).value = "/h"
+    := by
   native_decide
 
-example :
-    (completeInput { value := "/load ma.txt", cursor := 12 }
-      [{ replacement := "main.lean", range := some (6, 12) }]).value = "/load main.lean" := by
+example
+    : (completeInput { value := "/load ma.txt", cursor := 12 }
+      [{ replacement := "main.lean", range := some (6, 12) }]).value = "/load main.lean"
+    := by
   native_decide
 
 example :
@@ -65,14 +72,16 @@ example :
       some { candidates := #[{ replacement := "/help" }, { replacement := "/history" }] } := by
   native_decide
 
-example :
-    (renderCompletionMenu { width := 8 } { candidates := #[{ replacement := "long" }] }).plainText
-      |>.splitOn "\n" |>.all (·.length ≤ 8) := by
+example
+    : (renderCompletionMenu { width := 8 } { candidates := #[{ replacement := "long" }] }).plainText
+      |>.splitOn "\n" |>.all (·.length ≤ 8)
+    := by
   native_decide
 
-example :
-    (update config commandCompletion { input := { value := "2+2", cursor := 3 }} .enter).2 =
-      .submit "2+2" := by
+example
+    : (update config commandCompletion { input := { value := "2+2", cursor := 3 }} .enter).2 =
+      .submit "2+2"
+    := by
   native_decide
 
 example :
@@ -81,66 +90,78 @@ example :
     (update config overlappingCompletion state .enter).2 = .submit "/to-lean" := by
   native_decide
 
-example :
-    normalizeHistory historyConfig [" first ", "", "second", "first", "third"] =
-      #["first", "third"] := by
+example
+    : normalizeHistory historyConfig [" first ", "", "second", "first", "third"] =
+      #["first", "third"]
+    := by
   native_decide
 
-example :
-    normalizeHistory { historyConfig with deduplicate := false } ["first", "first"] =
-      #["first", "first"] := by
+example
+    : normalizeHistory { historyConfig with deduplicate := false } ["first", "first"] =
+      #["first", "first"]
+    := by
   native_decide
 
-example :
-    (updateMultiline multilineConfig (fun _ => [])
-      { input := { value := "1+2", cursor := 3 }} (.ctrl 'n')).1.input.value = "1+2\n" := by
+example
+    : (updateMultiline multilineConfig (fun _ => [])
+      { input := { value := "1+2", cursor := 3 }} (.ctrl 'n')).1.input.value = "1+2\n"
+    := by
   native_decide
 
-example :
-    (updateMultiline multilineConfig (fun _ => [])
-      { input := { value := "a\nbc", cursor := 4 }} .up).1.input.cursor = 1 := by
+example
+    : (updateMultiline multilineConfig (fun _ => [])
+      { input := { value := "a\nbc", cursor := 4 }} .up).1.input.cursor = 1
+    := by
   native_decide
 
-example :
-    (updateMultiline multilineConfig (fun _ => [])
-      { input := { value := "a\nb", cursor := 3 }} .enter).2 = .submit "a\nb" := by
+example
+    : (updateMultiline multilineConfig (fun _ => [])
+      { input := { value := "a\nb", cursor := 3 }} .enter).2 = .submit "a\nb"
+    := by
   native_decide
 
-example :
-    (defaultEditorKeymap.resolve [KeyContext.editor] .enter) = some .submit := by
+example
+    : (defaultEditorKeymap.resolve [KeyContext.editor] .enter) = some .submit
+    := by
   native_decide
 
-example :
-    (defaultEditorKeymap.resolveBinding [KeyContext.editor] .enter).map (·.action) =
-      some .submit := by
+example
+    : (defaultEditorKeymap.resolveBinding [KeyContext.editor] .enter).map (·.action) = some .submit
+    := by
   native_decide
 
-example :
-    defaultEditorKeymap.conflicts = [] := by
+example
+    : defaultEditorKeymap.conflicts = []
+    := by
   native_decide
 
-example :
-    (defaultEditorKeymap.resolve [KeyContext.editor, KeyContext.completion] .escape) =
-      some .dismissCompletion := by
+example
+    : (defaultEditorKeymap.resolve [KeyContext.editor, KeyContext.completion] .escape) =
+      some .dismissCompletion
+    := by
   native_decide
 
-example :
-    (defaultEditorKeymap.resolve [KeyContext.multiline, KeyContext.editor] (.ctrl 'n')) =
-      some .lineBreak := by
+example
+    : (defaultEditorKeymap.resolve [KeyContext.multiline, KeyContext.editor] (.ctrl 'n')) =
+      some .lineBreak
+    := by
   native_decide
 
-example :
-    (defaultEditorKeymap .enter).resolve [KeyContext.multiline, KeyContext.editor] .enter =
-      some .lineBreak := by
+example
+    : (defaultEditorKeymap .enter).resolve [KeyContext.multiline, KeyContext.editor] .enter =
+      some .lineBreak
+    := by
   native_decide
 
-example :
-    (updateMultiline { multilineConfig with lineBreak := .enter } (fun _ => [])
-      { input := { value := "p", cursor := 1 }} .enter).1.input.value = "p\n" := by
+example
+    : (updateMultiline { multilineConfig with lineBreak := .enter } (fun _ => [])
+      { input := { value := "p", cursor := 1 }} .enter).1.input.value = "p\n"
+    := by
   native_decide
 
-example :
-    (customEditorKeymap.resolve [KeyContext.editor] (.ctrl 's')) = some .submit := by
+example
+    : (customEditorKeymap.resolve [KeyContext.editor] (.ctrl 's')) = some .submit
+    := by
   native_decide
 
 example :
@@ -155,7 +176,9 @@ example :
       .submit "p => p" := by
   native_decide
 
-example : Keymap.keyLabel (.ctrl 's') = "Ctrl-s" := by
+example
+    : Keymap.keyLabel (.ctrl 's') = "Ctrl-s"
+    := by
   native_decide
 
 end TermColor.Repl.Properties

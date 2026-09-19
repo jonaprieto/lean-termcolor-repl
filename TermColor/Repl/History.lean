@@ -53,7 +53,8 @@ def serializeHistory
 /-- Read persisted history. Missing, unreadable, or malformed files return an error. -/
 def loadHistory
     (config : HistoryConfig)
-    : IO (Except String (Array String)) := do
+    : IO (Except String (Array String))
+    := do
   try
     let contents ← IO.FS.readFile config.path
     pure (.ok (normalizeHistory config (contents.splitOn "\n")))
@@ -64,7 +65,8 @@ def loadHistory
 def saveHistory
     (config : HistoryConfig)
     (history : Array String)
-    : IO (Except String Unit) := do
+    : IO (Except String Unit)
+    := do
   try
     let normalized := normalizeHistory config history.toList
     IO.FS.writeFile config.path (serializeHistory normalized)
