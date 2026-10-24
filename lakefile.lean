@@ -11,7 +11,7 @@ require «termcolor-terminal» from git
 
 require argus from git
   "https://github.com/jonaprieto/lean-argus.git"
-  @ "v0.5.5"
+  @ "v0.5.6"
 
 @[default_target]
 lean_lib «TermColor.Repl» where
