@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.9 — 2026-10-24
+
+- Refresh Argus to v0.5.6, which carries Grip v0.4.1.
+- Lay out declarations one binder group per line.
+
 ## 0.8.8 — 2026-09-09
 
 - Refresh Argus and Terminal and document the contribution policy and package problem.
