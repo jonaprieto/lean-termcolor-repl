@@ -52,19 +52,25 @@ jobs:
           TERMCOLOR_READ_TOKEN: ${{ secrets.TERMCOLOR_READ_TOKEN }}
         run: |
           lake -d docbuild update
-          lake -d docbuild build TermColor.Repl
-          lake -d docbuild build TermColor.Repl.Terminal
-          lake -d docbuild build TermColor.Repl.FileCompletion
+          lake -d docbuild build TermColor.Repl.Command TermColor.Repl.History TermColor.Repl.Terminal
           mkdir -p .lake/packages/termcolor/.lake/build/lib/lean/TermColor
-          cp -R .lake/packages/termcolor-layout/.lake/build/lib/lean/TermColor/. .lake/packages/termcolor/.lake/build/lib/lean/TermColor/
-          cp -R .lake/packages/termcolor-widgets/.lake/build/lib/lean/TermColor/. .lake/packages/termcolor/.lake/build/lib/lean/TermColor/
-          cp -R .lake/packages/termcolor-terminal/.lake/build/lib/lean/TermColor/. .lake/packages/termcolor/.lake/build/lib/lean/TermColor/
+          for pkg in termcolor-layout termcolor-widgets termcolor-terminal termcolor-diagnostics; do
+            cp -R ".lake/packages/$pkg/.lake/build/lib/lean/TermColor/." \
+              .lake/packages/termcolor/.lake/build/lib/lean/TermColor/
+          done
           cp -R .lake/build/lib/lean/TermColor/. .lake/packages/termcolor/.lake/build/lib/lean/TermColor/
           mkdir -p .lake/packages/termcolor-widgets/.lake/build/lib/lean/TermColor
           cp -R .lake/packages/termcolor/.lake/build/lib/lean/TermColor/. .lake/packages/termcolor-widgets/.lake/build/lib/lean/TermColor/
           cp -R .lake/packages/termcolor/.lake/build/lib/lean/. .lake/packages/termcolor-widgets/.lake/build/lib/lean/
-          lake -d docbuild build TermColor.Repl:docs TermColor.Repl.Terminal:docs
-          lake -d docbuild build TermColor.Repl.FileCompletion:docs
+          # Generate one index spanning the independent public entry points.
+          lake -d docbuild build +TermColor.Repl.Command:docInfo \
+            +TermColor.Repl.History:docInfo +TermColor.Repl.Terminal:docInfo
+          lake -d docbuild exe doc-gen4 fromDb --build docbuild/.lake/build \
+            docbuild/.lake/build/api-docs.db TermColor.Repl.Command TermColor.Repl.History \
+            TermColor.Repl.Terminal Init Std Lake Lean
+          for module in Command FileCompletion History Keymap Terminal; do
+            test -s "docbuild/.lake/build/doc/TermColor/Repl/$module.html"
+          done
           touch docbuild/.lake/build/doc/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
