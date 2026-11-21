@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.10 — 2026-11-20
+
+- Support Lean v4.36.0.
+
 ## 0.8.9 — 2026-10-24
 
 - Refresh Argus to v0.5.6, which carries Grip v0.4.1.
